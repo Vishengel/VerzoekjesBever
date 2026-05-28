@@ -1,8 +1,17 @@
 [project]
-name = "pythonproject"
+name = "verzoekjesbever"
 version = "0.1.0"
-description = "Add your description here"
+description = "Party song request app — manage Spotify playlists with a DJ interface and audience beamer display"
 requires-python = ">=3.12"
 dependencies = [
     "spotipy>=2.26.0",
+    "nicegui>=2.20.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
 ]
