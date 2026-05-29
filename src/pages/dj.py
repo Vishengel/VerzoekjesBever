@@ -4,12 +4,12 @@ from main import get_service
 from models import PlaybackState, QueueItem
 
 
-@ui.page("/dj", title="VerzoekjesBever — DJ", dark=True)
+@ui.page("/dj", title="VerzoekjesBever - DJ", dark=True)
 def dj_page():
     svc = get_service()
 
     if not svc.has_session:
-        ui.navigate.to("/setup")
+        ui.navigate.to("/")
         return
 
     requester_input = None
@@ -22,8 +22,8 @@ def dj_page():
                 ui.label("🦫 VerzoekjesBever — DJ").classes("text-2xl font-bold")
                 with ui.row().classes("gap-2"):
                     ui.button(
-                        "Audience View",
-                        on_click=lambda: ui.run_javascript("window.open('/', '_blank')"),
+                        "Display",
+                        on_click=lambda: ui.run_javascript("window.open('/display', '_blank')"),
                     ).props("flat color=grey dense")
                     ui.button(
                         "Settings",
@@ -34,14 +34,14 @@ def dj_page():
                 ui.label("Requester name").classes("text-sm text-gray-400")
                 requester_input = ui.input(placeholder="Guest name...").classes("w-full")
 
-            with ui.row().classes("w-full gap-2"):
+            with ui.row().classes("w-full gap-2 items-center"):
                 search_input = ui.input(placeholder="Search song or artist...").classes("flex-grow")
                 ui.button("Search", on_click=lambda: do_search(search_input.value)).props("color=primary")
                 search_input.on("keydown.enter", lambda: do_search(search_input.value))
 
             search_results_container = ui.column().classes("w-full gap-2 overflow-auto flex-grow")
 
-        # Right panel — Queue + Controls
+        # Right panel - Queue + Controls
         with ui.column().classes("w-1/2 p-6 gap-4 h-full"):
             # Device switcher
             @ui.refreshable

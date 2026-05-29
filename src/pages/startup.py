@@ -3,7 +3,7 @@ from nicegui import ui
 from main import get_service
 
 
-@ui.page("/setup", title="VerzoekjesBever — Setup", dark=True)
+@ui.page("/", title="VerzoekjesBever - Setup", dark=True)
 def setup_page():
     svc = get_service()
 
@@ -27,7 +27,7 @@ def setup_page():
             ui.separator()
 
         ui.label("New Session").classes("text-lg font-semibold")
-        session_name = ui.input("Session name", value="VerzoekjesBever — Party").classes("w-full")
+        session_name = ui.input("Session name", value="VerzoekjesBever - Party").classes("w-full")
 
         ui.label("Select playback device").classes("text-sm text-gray-400 mt-2")
         devices = svc.get_devices()
