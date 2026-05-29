@@ -8,7 +8,17 @@ from party_service import PartyService
 from persistence import QueueStore
 
 
-def _track_dict(name: str = "Song", artist: str = "Artist", uri: str = "spotify:track:s1") -> dict:
+def _make_item(name="Song", artist="Artist", uri="spotify:track:s1", requester="") -> QueueItem:
+    return QueueItem(
+        track_name=name,
+        artist=artist,
+        album_art_url="https://img.com/art.jpg",
+        requester=requester,
+        track_uri=uri,
+    )
+
+
+def _track_dict(name="Song", artist="Artist", uri="spotify:track:s1") -> dict:
     return {
         "name": name,
         "artists": [{"name": artist}],
@@ -55,39 +65,39 @@ def test_search_songs(service, mock_spotify):
     pytest.assume(results[0].requester == "")
 
 
-def test_add_song_to_queue(service, mock_spotify):
+def test_add_to_queue(service):
     service.start_session("Party", "dev1")
-    service.add_song(track=_track_dict(), requester="Lisa")
+    service.add_to_queue(_make_item(requester="Lisa"))
     pytest.assume(len(service.get_queue()) == 1)
     pytest.assume(service.get_queue()[0].requester == "Lisa")
 
 
-def test_add_song_to_top(service, mock_spotify):
+def test_add_to_queue_top(service):
     service.start_session("Party", "dev1")
-    service.add_song(track=_track_dict("Song1", uri="spotify:track:s1"), requester="Lisa")
-    service.add_song(track=_track_dict("Song2", uri="spotify:track:s2"), requester="Mark", top=True)
+    service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
+    service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="Mark"), top=True)
     pytest.assume(service.get_queue()[0].track_name == "Song2")
 
 
 def test_remove_from_queue(service):
     service.start_session("Party", "dev1")
-    service.add_song(track=_track_dict(), requester="Lisa")
+    service.add_to_queue(_make_item(requester="Lisa"))
     service.remove_from_queue("spotify:track:s1")
     pytest.assume(service.get_queue() == [])
 
 
 def test_move_to_top(service):
     service.start_session("Party", "dev1")
-    service.add_song(track=_track_dict("S1", uri="spotify:track:s1"), requester="A")
-    service.add_song(track=_track_dict("S2", uri="spotify:track:s2"), requester="B")
-    service.add_song(track=_track_dict("S3", uri="spotify:track:s3"), requester="C")
+    service.add_to_queue(_make_item("S1", uri="spotify:track:s1", requester="A"))
+    service.add_to_queue(_make_item("S2", uri="spotify:track:s2", requester="B"))
+    service.add_to_queue(_make_item("S3", uri="spotify:track:s3", requester="C"))
     service.move_to_top("spotify:track:s3")
     pytest.assume(service.get_queue()[0].track_name == "S3")
 
 
 def test_play_next(service, mock_spotify):
     service.start_session("Party", "dev1")
-    service.add_song(track=_track_dict("Song1", uri="spotify:track:s1"), requester="Lisa")
+    service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
     service.play_next()
     mock_spotify.play_track.assert_called_once_with("spotify:track:s1", device_id="dev1")
     pytest.assume(service.get_currently_playing().track_name == "Song1")
@@ -103,7 +113,7 @@ def test_play_next_empty_queue(service, mock_spotify):
 
 def test_pause(service, mock_spotify):
     service.start_session("Party", "dev1")
-    service.add_song(track=_track_dict(), requester="Lisa")
+    service.add_to_queue(_make_item(requester="Lisa"))
     service.play_next()
     service.pause()
     mock_spotify.pause.assert_called_once_with(device_id="dev1")
@@ -112,7 +122,7 @@ def test_pause(service, mock_spotify):
 
 def test_resume(service, mock_spotify):
     service.start_session("Party", "dev1")
-    service.add_song(track=_track_dict(), requester="Lisa")
+    service.add_to_queue(_make_item(requester="Lisa"))
     service.play_next()
     service.pause()
     service.resume()
@@ -131,14 +141,14 @@ def test_version_increments(service):
     service.start_session("Party", "dev1")
     pytest.assume(service.version > v0)
     v1 = service.version
-    service.add_song(track=_track_dict(), requester="Lisa")
+    service.add_to_queue(_make_item(requester="Lisa"))
     pytest.assume(service.version > v1)
 
 
 def test_poll_detects_track_ended(service, mock_spotify):
     service.start_session("Party", "dev1")
-    service.add_song(track=_track_dict("Song1", uri="spotify:track:s1"), requester="Lisa")
-    service.add_song(track=_track_dict("Song2", uri="spotify:track:s2"), requester="Mark")
+    service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
+    service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="Mark"))
     service.play_next()
 
     mock_spotify.get_playback_state.return_value = {
@@ -154,7 +164,7 @@ def test_poll_detects_track_ended(service, mock_spotify):
 
 def test_poll_track_ended_empty_queue_goes_idle(service, mock_spotify):
     service.start_session("Party", "dev1")
-    service.add_song(track=_track_dict(), requester="Lisa")
+    service.add_to_queue(_make_item(requester="Lisa"))
     service.play_next()
 
     mock_spotify.get_playback_state.return_value = {
@@ -170,7 +180,7 @@ def test_poll_track_ended_empty_queue_goes_idle(service, mock_spotify):
 
 def test_poll_still_playing_no_change(service, mock_spotify):
     service.start_session("Party", "dev1")
-    service.add_song(track=_track_dict(), requester="Lisa")
+    service.add_to_queue(_make_item(requester="Lisa"))
     service.play_next()
     v = service.version
 
@@ -192,7 +202,7 @@ def test_poll_no_playback_state(service, mock_spotify):
 
 def test_play_next_bumps_skip_version(service, mock_spotify):
     service.start_session("Party", "dev1")
-    service.add_song(track=_track_dict(), requester="Lisa")
+    service.add_to_queue(_make_item(requester="Lisa"))
     pytest.assume(service.last_skip_version == 0)
     service.play_next()
     pytest.assume(service.last_skip_version == 1)
@@ -200,8 +210,8 @@ def test_play_next_bumps_skip_version(service, mock_spotify):
 
 def test_poll_track_end_does_not_bump_skip_version(service, mock_spotify):
     service.start_session("Party", "dev1")
-    service.add_song(track=_track_dict("Song1", uri="spotify:track:s1"), requester="Lisa")
-    service.add_song(track=_track_dict("Song2", uri="spotify:track:s2"), requester="Mark")
+    service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
+    service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="Mark"))
     service.play_next()
     skip_v = service.last_skip_version
 
@@ -225,27 +235,27 @@ def test_set_beaver_enabled(service):
     pytest.assume(service.beaver_enabled is True)
 
 
-def test_update_requester(service, mock_spotify):
+def test_update_requester(service):
     service.start_session("Party", "dev1")
-    service.add_song(track=_track_dict(uri="spotify:track:s1"), requester="Typo")
+    service.add_to_queue(_make_item(uri="spotify:track:s1", requester="Typo"))
     v = service.version
     service.update_requester("spotify:track:s1", "Fixed")
     pytest.assume(service.get_queue()[0].requester == "Fixed")
     pytest.assume(service.version > v)
 
 
-def test_get_known_requesters(service, mock_spotify):
+def test_get_known_requesters(service):
     service.start_session("Party", "dev1")
-    service.add_song(track=_track_dict("S1", uri="spotify:track:s1"), requester="Alice")
-    service.add_song(track=_track_dict("S2", uri="spotify:track:s2"), requester="Bob")
-    service.add_song(track=_track_dict("S3", uri="spotify:track:s3"), requester="Alice")
+    service.add_to_queue(_make_item("S1", uri="spotify:track:s1", requester="Alice"))
+    service.add_to_queue(_make_item("S2", uri="spotify:track:s2", requester="Bob"))
+    service.add_to_queue(_make_item("S3", uri="spotify:track:s3", requester="Alice"))
     pytest.assume(service.get_known_requesters() == ["Alice", "Bob"])
 
 
 def test_get_known_requesters_includes_currently_playing(service, mock_spotify):
     service.start_session("Party", "dev1")
-    service.add_song(track=_track_dict("S1", uri="spotify:track:s1"), requester="Charlie")
-    service.add_song(track=_track_dict("S2", uri="spotify:track:s2"), requester="Dana")
+    service.add_to_queue(_make_item("S1", uri="spotify:track:s1", requester="Charlie"))
+    service.add_to_queue(_make_item("S2", uri="spotify:track:s2", requester="Dana"))
     service.play_next()
     pytest.assume("Charlie" in service.get_known_requesters())
     pytest.assume("Dana" in service.get_known_requesters())
@@ -253,7 +263,7 @@ def test_get_known_requesters_includes_currently_playing(service, mock_spotify):
 
 def test_session_persists_across_restart(service, mock_spotify, tmp_path):
     service.start_session("Party", "dev1")
-    service.add_song(track=_track_dict("Song1", uri="spotify:track:s1"), requester="Lisa")
+    service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
 
     store2 = QueueStore(tmp_path / "session.json")
     svc2 = PartyService(spotify=mock_spotify, store=store2)

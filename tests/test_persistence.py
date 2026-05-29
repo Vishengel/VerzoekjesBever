@@ -164,3 +164,47 @@ def test_file_created_on_mutation(tmp_path: Path):
     pytest.assume(not path.exists())
     store.start_session("Party", "dev1")
     pytest.assume(path.exists())
+
+
+def test_get_known_requesters(tmp_path: Path):
+    store = QueueStore(tmp_path / "session.json")
+    store.start_session("Party", "dev1")
+    store.add_to_queue(_make_item("Song1", requester="Alice"))
+    store.add_to_queue(_make_item("Song2", requester="Bob"))
+    store.add_to_queue(_make_item("Song3", requester="Alice"))
+    pytest.assume(store.get_known_requesters() == ["Alice", "Bob"])
+
+
+def test_get_known_requesters_includes_currently_playing(tmp_path: Path):
+    store = QueueStore(tmp_path / "session.json")
+    store.start_session("Party", "dev1")
+    store.set_currently_playing(_make_item("Now", requester="Charlie"), PlaybackState.PLAYING)
+    store.add_to_queue(_make_item("Next", requester="Dana"))
+    requesters = store.get_known_requesters()
+    pytest.assume("Charlie" in requesters)
+    pytest.assume("Dana" in requesters)
+
+
+def test_get_known_requesters_excludes_empty(tmp_path: Path):
+    store = QueueStore(tmp_path / "session.json")
+    store.start_session("Party", "dev1")
+    store.add_to_queue(_make_item("Song1", requester=""))
+    store.add_to_queue(_make_item("Song2", requester="Alice"))
+    pytest.assume(store.get_known_requesters() == ["Alice"])
+
+
+def test_corrupt_file_starts_fresh(tmp_path: Path):
+    path = tmp_path / "session.json"
+    path.write_text("not valid json {{{")
+    store = QueueStore(path)
+    pytest.assume(store.session_name is None)
+    pytest.assume(store.queue == [])
+
+
+def test_atomic_write_produces_valid_file(tmp_path: Path):
+    path = tmp_path / "session.json"
+    store = QueueStore(path)
+    store.start_session("Party", "dev1")
+    store.add_to_queue(_make_item("Song1"))
+    tmp_file = path.with_suffix(".tmp")
+    pytest.assume(not tmp_file.exists())

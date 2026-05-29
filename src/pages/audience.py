@@ -2,105 +2,18 @@ import asyncio
 
 from nicegui import ui
 
-from main import get_service
+from deps import get_service
 
 
 @ui.page("/display", title="VerzoekjesBever", dark=True)
 def audience_page():
     svc = get_service()
 
+    ui.add_head_html('<link rel="stylesheet" href="/static/beaver-animation.css">')
+    ui.add_head_html('<script src="/static/beaver-animation.js"></script>')
     ui.add_head_html("""
     <style>
         body { background: linear-gradient(135deg, #0d0d1a 0%, #1a1a3e 100%) !important; }
-
-        .now-playing-wrapper {
-            position: relative;
-            overflow: visible;
-        }
-
-        .beaver-overlay {
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-            z-index: 50;
-            overflow: hidden;
-        }
-
-        .beaver-actor {
-            position: absolute;
-            font-size: 80px;
-            line-height: 1;
-            filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));
-        }
-
-        /* Chomp animation */
-        @keyframes chomp-slide-in {
-            0% { transform: translateX(-150%) rotate(-10deg); }
-            30% { transform: translateX(10%) rotate(5deg); }
-            50% { transform: translateX(30%) rotate(-5deg) scaleX(-1); }
-            70% { transform: translateX(50%) rotate(5deg); }
-            100% { transform: translateX(150%) rotate(10deg); }
-        }
-
-        @keyframes chomp-card-shake {
-            0%, 100% { transform: translateX(0); opacity: 1; }
-            20% { transform: translateX(-8px) rotate(-1deg); }
-            30% { transform: translateX(8px) rotate(1deg); opacity: 0.7; }
-            40% { transform: translateX(-5px); }
-            50% { transform: translateX(5px); opacity: 0.5; }
-            60% { transform: translateX(-3px); opacity: 0.6; }
-            80% { transform: translateX(0); opacity: 0.8; }
-        }
-
-        .beaver-chomp .beaver-actor {
-            top: 50%;
-            left: 0;
-            margin-top: -40px;
-            animation: chomp-slide-in 2s ease-in-out forwards;
-        }
-
-        .beaver-chomp .now-playing-card {
-            animation: chomp-card-shake 2s ease-in-out;
-        }
-
-        /* Bat smash animation */
-        @keyframes bat-drop-in {
-            0% { transform: translateY(-200%) rotate(0deg); }
-            35% { transform: translateY(-10%) rotate(0deg); }
-            45% { transform: translateY(0%) rotate(45deg); }
-            55% { transform: translateY(0%) rotate(-15deg); }
-            65% { transform: translateY(0%) rotate(10deg); }
-            100% { transform: translateY(-200%) rotate(0deg); }
-        }
-
-        @keyframes bat-card-shatter {
-            0% { transform: scale(1); opacity: 1; clip-path: inset(0); }
-            40% { transform: scale(1); opacity: 1; clip-path: inset(0); }
-            50% { transform: scale(1.05); opacity: 0.9; }
-            60% { transform: scale(0.95) rotate(2deg); opacity: 0.6; clip-path: polygon(0% 0%, 60% 0%, 70% 50%, 30% 100%, 0% 100%); }
-            75% { transform: scale(0.9) rotate(-1deg); opacity: 0.3; clip-path: polygon(10% 10%, 50% 0%, 60% 60%, 20% 80%); }
-            100% { transform: scale(1); opacity: 1; clip-path: inset(0); }
-        }
-
-        .beaver-bat .beaver-actor {
-            top: 0;
-            left: 50%;
-            margin-left: -40px;
-            animation: bat-drop-in 2s ease-in-out forwards;
-        }
-
-        .beaver-bat .beaver-bat-weapon {
-            position: absolute;
-            top: 15%;
-            left: 50%;
-            margin-left: 10px;
-            font-size: 50px;
-            animation: bat-drop-in 2s ease-in-out forwards;
-        }
-
-        .beaver-bat .now-playing-card {
-            animation: bat-card-shatter 2s ease-in-out;
-        }
     </style>
     """)
 
@@ -159,45 +72,6 @@ def audience_page():
 
         playlist_display()
 
-        BEAVER_ANIMATION_JS = """
-(function() {
-    const wrapper = document.querySelector('.now-playing-wrapper');
-    if (!wrapper) return;
-
-    // Remove any existing overlay
-    const existing = wrapper.querySelector('.beaver-overlay');
-    if (existing) existing.remove();
-
-    // Pick random animation
-    const animations = ['beaver-chomp', 'beaver-bat'];
-    const pick = animations[Math.floor(Math.random() * animations.length)];
-
-    // Create overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'beaver-overlay ' + pick;
-
-    const beaver = document.createElement('span');
-    beaver.className = 'beaver-actor';
-    beaver.textContent = '🦫';
-    overlay.appendChild(beaver);
-
-    if (pick === 'beaver-bat') {
-        const bat = document.createElement('span');
-        bat.className = 'beaver-bat-weapon';
-        bat.textContent = '🏏';
-        overlay.appendChild(bat);
-    }
-
-    wrapper.classList.add(pick);
-    wrapper.appendChild(overlay);
-
-    setTimeout(() => {
-        overlay.remove();
-        wrapper.classList.remove(pick);
-    }, 2200);
-})();
-"""
-
         local_version = {"v": svc.version}
         local_skip_version = {"v": svc.last_skip_version}
 
@@ -211,7 +85,7 @@ def audience_page():
                 local_skip_version["v"] = svc.last_skip_version
 
                 if skip_happened:
-                    await ui.run_javascript(BEAVER_ANIMATION_JS)
+                    await ui.run_javascript("triggerBeaverAnimation()")
                     await asyncio.sleep(2.2)
 
                 playlist_display.refresh()

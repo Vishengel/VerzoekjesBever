@@ -1,7 +1,10 @@
 import json
+import logging
 from pathlib import Path
 
 from models import PlaybackState, QueueItem
+
+logger = logging.getLogger(__name__)
 
 
 class QueueStore:
@@ -76,6 +79,15 @@ class QueueStore:
                 self._save()
                 return
 
+    def get_known_requesters(self) -> list[str]:
+        names: set[str] = set()
+        if self.currently_playing and self.currently_playing.requester:
+            names.add(self.currently_playing.requester)
+        for item in self.queue:
+            if item.requester:
+                names.add(item.requester)
+        return sorted(names)
+
     def set_device(self, device_id: str) -> None:
         self.device_id = device_id
         self._save()
@@ -83,7 +95,11 @@ class QueueStore:
     def _load(self) -> None:
         if not self._path.exists():
             return
-        data = json.loads(self._path.read_text())
+        try:
+            data = json.loads(self._path.read_text())
+        except (json.JSONDecodeError, ValueError):
+            logger.warning("Corrupt session file at %s, starting fresh", self._path)
+            return
         self.session_name = data.get("session_name")
         self.device_id = data.get("device_id")
         self.playback_state = PlaybackState(data.get("playback_state", "idle"))
@@ -100,4 +116,6 @@ class QueueStore:
             "currently_playing": self.currently_playing.to_dict() if self.currently_playing else None,
             "queue": [q.to_dict() for q in self.queue],
         }
-        self._path.write_text(json.dumps(data, indent=2))
+        tmp = self._path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, indent=2))
+        tmp.replace(self._path)

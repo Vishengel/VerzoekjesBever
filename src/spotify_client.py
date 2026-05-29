@@ -13,6 +13,7 @@ class SpotifyClient(Spotify):
     ]
 
     def __init__(self):
+        CONFIG.cache_dir.mkdir(parents=True, exist_ok=True)
         super().__init__(
             auth_manager=SpotifyOAuth(
                 client_id=CONFIG.spotipy_client_id,

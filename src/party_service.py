@@ -65,8 +65,7 @@ class PartyService:
         tracks = self._spotify.search_tracks(query)
         return [QueueItem.from_spotify_track(t, requester="") for t in tracks]
 
-    def add_song(self, track: dict, requester: str, top: bool = False) -> None:
-        item = QueueItem.from_spotify_track(track, requester=requester)
+    def add_to_queue(self, item: QueueItem, top: bool = False) -> None:
         self._store.add_to_queue(item, top=top)
         self._bump_version()
 
@@ -112,13 +111,7 @@ class PartyService:
         self._bump_version()
 
     def get_known_requesters(self) -> list[str]:
-        names: set[str] = set()
-        if self._store.currently_playing and self._store.currently_playing.requester:
-            names.add(self._store.currently_playing.requester)
-        for item in self._store.queue:
-            if item.requester:
-                names.add(item.requester)
-        return sorted(names)
+        return self._store.get_known_requesters()
 
     def get_devices(self) -> list[dict]:
         return self._spotify.get_devices()

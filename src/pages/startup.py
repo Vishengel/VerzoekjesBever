@@ -1,6 +1,6 @@
 from nicegui import ui
 
-from main import get_service
+from deps import get_service
 
 
 @ui.page("/", title="VerzoekjesBever - Setup", dark=True)

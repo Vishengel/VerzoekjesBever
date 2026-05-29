@@ -9,8 +9,6 @@ class Config(BaseSettings):
     project_root: ClassVar[Path] = Path(__file__).parent.parent
     cache_dir: ClassVar[Path] = project_root / "cache"
 
-    cache_dir.mkdir(parents=True, exist_ok=True)
-
     spotipy_client_id: str
     spotipy_client_secret: SecretStr
     spotipy_redirect_uri: str

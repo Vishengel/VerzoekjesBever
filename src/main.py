@@ -1,26 +1,18 @@
 import asyncio
 import logging
+from pathlib import Path
 
 from nicegui import app, background_tasks, ui
 from spotipy.exceptions import SpotifyException
 
-from config import CONFIG
-from party_service import PartyService
-from persistence import QueueStore
-from spotify_client import SpotifyClient
+from deps import get_service
 
 logger = logging.getLogger(__name__)
 
-service: PartyService | None = None
+app.add_static_files("/static", str(Path(__file__).parent / "static"))
 
-
-def get_service() -> PartyService:
-    global service
-    if service is None:
-        spotify = SpotifyClient()
-        store = QueueStore(CONFIG.queue_store_path)
-        service = PartyService(spotify=spotify, store=store)
-    return service
+# Import pages to register routes
+from pages import audience, dj, startup  # noqa: E402, F401
 
 
 async def poll_loop() -> None:
@@ -33,10 +25,6 @@ async def poll_loop() -> None:
         except SpotifyException:
             logger.error("Polling error", exc_info=True)
         await asyncio.sleep(3.0)
-
-
-# Import pages to register routes
-from pages import audience, dj, startup  # noqa: E402, F401
 
 
 def main():
