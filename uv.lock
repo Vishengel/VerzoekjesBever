@@ -1100,6 +1100,19 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-assume"
+version = "2.4.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+    { name = "six" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4a/95/28dcc584679367b15360e1b7b3167311f80cc735b8b2f5ecfa89b7319d10/pytest-assume-2.4.3.tar.gz", hash = "sha256:983e90537660fd7aa18bb554693523020272e7edeee3e40435593297bcc6347e", size = 8695, upload-time = "2021-06-24T17:13:00.321Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e8/5d/ecd54af3d3dc3f69e9cf527449a51bd5ca39cd47aaeab9a74e55603a9ce1/pytest_assume-2.4.3-py3-none-any.whl", hash = "sha256:09074220213b87cf1f400609701a44b75078b4e69588c7227e061ff9b3ecf54b", size = 5980, upload-time = "2021-06-24T17:12:59.186Z" },
+]
+
+[[package]]
 name = "pytest-asyncio"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1243,6 +1256,15 @@ wheels = [
 ]
 
 [[package]]
+name = "six"
+version = "1.17.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
+]
+
+[[package]]
 name = "spotipy"
 version = "2.26.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1375,12 +1397,14 @@ dependencies = [
     { name = "nicegui" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "pytest" },
     { name = "spotipy" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "pytest" },
+    { name = "pytest-assume" },
     { name = "pytest-asyncio" },
 ]
 
@@ -1389,12 +1413,14 @@ requires-dist = [
     { name = "nicegui", specifier = ">=2.20.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
+    { name = "pytest", specifier = ">=9.0.3" },
     { name = "spotipy", specifier = ">=2.26.0" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "pytest", specifier = ">=8.0.0" },
+    { name = "pytest-assume", specifier = ">=2.4.3" },
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
 ]
 
