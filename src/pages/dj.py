@@ -1,14 +1,14 @@
 from nicegui import ui
 
 from main import get_service
-from models import QueueItem
+from models import PlaybackState, QueueItem
 
 
 @ui.page("/dj", title="VerzoekjesBever — DJ", dark=True)
 def dj_page():
     svc = get_service()
 
-    if svc.playlist_id is None:
+    if not svc.has_session:
         ui.navigate.to("/setup")
         return
 
@@ -17,8 +17,18 @@ def dj_page():
 
     with ui.row().classes("w-full h-screen gap-0"):
         # Left panel — Search
-        with ui.column().classes("w-1/2 p-6 gap-4 border-r border-gray-700"):
-            ui.label("🦫 VerzoekjesBever — DJ").classes("text-2xl font-bold")
+        with ui.column().classes("w-1/2 p-6 gap-4 border-r border-gray-700 h-full"):
+            with ui.row().classes("w-full items-center justify-between"):
+                ui.label("🦫 VerzoekjesBever — DJ").classes("text-2xl font-bold")
+                with ui.row().classes("gap-2"):
+                    ui.button(
+                        "Audience View",
+                        on_click=lambda: ui.run_javascript("window.open('/', '_blank')"),
+                    ).props("flat color=grey dense")
+                    ui.button(
+                        "Settings",
+                        on_click=lambda: ui.navigate.to("/setup"),
+                    ).props("flat color=grey dense")
 
             with ui.card().classes("w-full bg-gray-900"):
                 ui.label("Requester name").classes("text-sm text-gray-400")
@@ -29,11 +39,39 @@ def dj_page():
                 ui.button("Search", on_click=lambda: do_search(search_input.value)).props("color=primary")
                 search_input.on("keydown.enter", lambda: do_search(search_input.value))
 
-            search_results_container = ui.column().classes("w-full gap-2 overflow-auto")
+            search_results_container = ui.column().classes("w-full gap-2 overflow-auto flex-grow")
 
-        # Right panel — Queue
-        with ui.column().classes("w-1/2 p-6 gap-4"):
-            ui.label("Current Queue").classes("text-2xl font-bold")
+        # Right panel — Queue + Controls
+        with ui.column().classes("w-1/2 p-6 gap-4 h-full"):
+            # Device switcher
+            @ui.refreshable
+            def device_selector():
+                devices = svc.get_devices()
+                options = {d["id"]: f"{d['name']} ({d['type']})" for d in devices}
+                with ui.row().classes("w-full items-center gap-2"):
+                    ui.select(
+                        options=options,
+                        value=svc.device_id,
+                        label="Playback device",
+                        on_change=lambda e: svc.set_device(e.value),
+                    ).classes("flex-grow")
+                    ui.button(icon="refresh", on_click=device_selector.refresh).props("flat round dense")
+
+            device_selector()
+
+            # Playback controls
+            @ui.refreshable
+            def playback_controls():
+                state = svc.playback_state
+                with ui.row().classes("w-full justify-center gap-4"):
+                    if state == PlaybackState.PLAYING:
+                        ui.button("⏸ Pause", on_click=lambda: (svc.pause(), playback_controls.refresh(), queue_display.refresh())).props("color=warning")
+                    elif state == PlaybackState.PAUSED:
+                        ui.button("▶ Resume", on_click=lambda: (svc.resume(), playback_controls.refresh(), queue_display.refresh())).props("color=positive")
+
+                    ui.button("⏭ Next", on_click=lambda: (svc.play_next(), playback_controls.refresh(), queue_display.refresh())).props("color=primary")
+
+            playback_controls()
 
             @ui.refreshable
             def queue_display():
@@ -49,10 +87,10 @@ def dj_page():
                                 ui.label(current.artist).classes("text-gray-400")
                                 if current.requester:
                                     ui.label(f"Requested by {current.requester}").classes("text-sm text-orange-400")
-                            ui.button(
-                                "Remove",
-                                on_click=lambda: remove_current(),
-                            ).props("color=negative flat")
+                else:
+                    state_label = "Paused" if svc.playback_state == PlaybackState.PAUSED else "Ready to play"
+                    with ui.card().classes("w-full bg-gray-800 text-center p-6"):
+                        ui.label(state_label).classes("text-gray-400 text-lg")
 
                 ui.label("UP NEXT").classes("text-xs text-gray-400 tracking-widest mt-2")
                 queue = svc.get_queue()
@@ -70,9 +108,13 @@ def dj_page():
                                 if item.requester:
                                     ui.label(f"🎤 {item.requester}").classes("text-xs text-orange-400 mt-0.5")
                             ui.button(
+                                icon="vertical_align_top",
+                                on_click=lambda uri=item.track_uri: (svc.move_to_top(uri), queue_display.refresh()),
+                            ).props("flat round dense color=warning")
+                            ui.button(
                                 icon="delete",
-                                on_click=lambda uri=item.track_uri: remove_queued(uri),
-                            ).props("color=negative flat round dense")
+                                on_click=lambda uri=item.track_uri: (svc.remove_from_queue(uri), queue_display.refresh()),
+                            ).props("flat round dense color=negative")
 
             queue_display()
 
@@ -82,6 +124,7 @@ def dj_page():
                 if svc.version != local_version["v"]:
                     local_version["v"] = svc.version
                     queue_display.refresh()
+                    playback_controls.refresh()
 
             ui.timer(1.0, check_updates)
 
@@ -128,14 +171,4 @@ def dj_page():
         svc.add_song(track=track_dict, requester=requester, top=top)
         position = "top" if top else "queue"
         ui.notify(f"Added '{item.track_name}' to {position} for {requester}", type="positive")
-        queue_display.refresh()
-
-    def remove_current():
-        svc.remove_currently_playing()
-        ui.notify("Removed currently playing track", type="info")
-        queue_display.refresh()
-
-    def remove_queued(track_uri: str):
-        svc.remove_from_queue(track_uri)
-        ui.notify("Removed from queue", type="info")
         queue_display.refresh()
