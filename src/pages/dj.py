@@ -14,6 +14,7 @@ def dj_page():
 
     requester_input = None
     search_results_container = None
+    search_timer = {"handle": None}
 
     with ui.row().classes("w-full h-screen gap-0"):
         # Left panel — Search
@@ -38,17 +39,35 @@ def dj_page():
                     ).props("flat color=grey dense")
                     ui.button(
                         "Settings",
-                        on_click=lambda: ui.navigate.to("/setup"),
+                        on_click=lambda: ui.navigate.to("/"),
                     ).props("flat color=grey dense")
 
             with ui.card().classes("w-full bg-gray-900"):
                 ui.label("Requester name").classes("text-sm text-gray-400")
-                requester_input = ui.input(placeholder="Guest name...").classes("w-full")
+                requester_input = ui.input(
+                    placeholder="Guest name...",
+                    autocomplete=svc.get_known_requesters(),
+                ).classes("w-full")
+                requester_input.on(
+                    "focus",
+                    lambda: requester_input.set_autocomplete(svc.get_known_requesters()),
+                )
 
-            with ui.row().classes("w-full gap-2 items-center"):
-                search_input = ui.input(placeholder="Search song or artist...").classes("flex-grow")
-                ui.button("Search", on_click=lambda: do_search(search_input.value)).props("color=primary")
-                search_input.on("keydown.enter", lambda: do_search(search_input.value))
+            search_input = ui.input(placeholder="Search song or artist...").classes("w-full")
+
+            def on_search_input(e):
+                query = e.sender.value
+                if search_timer["handle"]:
+                    search_timer["handle"].deactivate()
+                if not query or len(query) < 2:
+                    search_results_container.clear()
+                    return
+                search_timer["handle"] = ui.timer(
+                    0.4, lambda q=query: do_search(q), once=True
+                )
+
+            search_input.on("input", on_search_input)
+            search_input.on("keydown.enter", lambda: do_search(search_input.value))
 
             search_results_container = ui.column().classes("w-full gap-2 overflow-auto flex-grow")
 
@@ -96,8 +115,12 @@ def dj_page():
                             with ui.column().classes("flex-grow gap-0"):
                                 ui.label(current.track_name).classes("text-lg font-bold text-green-400")
                                 ui.label(current.artist).classes("text-gray-400")
-                                if current.requester:
-                                    ui.label(f"Requested by {current.requester}").classes("text-sm text-orange-400")
+                                with ui.row().classes("items-center gap-1"):
+                                    ui.label(f"Requested by {current.requester}" if current.requester else "No requester").classes("text-sm text-orange-400")
+                                    ui.button(
+                                        icon="edit",
+                                        on_click=lambda uri=current.track_uri, name=current.requester: open_edit_requester(uri, name),
+                                    ).props("flat round dense size=xs color=orange")
                 else:
                     state_label = "Paused" if svc.playback_state == PlaybackState.PAUSED else "Ready to play"
                     with ui.card().classes("w-full bg-gray-800 text-center p-6"):
@@ -117,7 +140,12 @@ def dj_page():
                                 ui.label(item.track_name).classes("font-semibold")
                                 ui.label(item.artist).classes("text-sm text-gray-400")
                                 if item.requester:
-                                    ui.label(f"🎤 {item.requester}").classes("text-xs text-orange-400 mt-0.5")
+                                    with ui.row().classes("items-center gap-1"):
+                                        ui.label(f"🎤 {item.requester}").classes("text-xs text-orange-400 mt-0.5")
+                                        ui.button(
+                                            icon="edit",
+                                            on_click=lambda uri=item.track_uri, name=item.requester: open_edit_requester(uri, name),
+                                        ).props("flat round dense size=xs color=orange")
                             ui.button(
                                 icon="vertical_align_top",
                                 on_click=lambda uri=item.track_uri: (svc.move_to_top(uri), queue_display.refresh()),
@@ -138,6 +166,26 @@ def dj_page():
                     playback_controls.refresh()
 
             ui.timer(1.0, check_updates)
+
+    def open_edit_requester(track_uri: str, current_name: str):
+        with ui.dialog() as dialog, ui.card().classes("bg-gray-900 min-w-[300px]"):
+            ui.label("Edit requester").classes("text-lg font-bold")
+            name_input = ui.input(
+                value=current_name,
+                placeholder="Requester name...",
+                autocomplete=svc.get_known_requesters(),
+            ).classes("w-full")
+
+            def save():
+                svc.update_requester(track_uri, name_input.value.strip())
+                queue_display.refresh()
+                dialog.close()
+
+            name_input.on("keydown.enter", save)
+            with ui.row().classes("w-full justify-end gap-2 mt-2"):
+                ui.button("Cancel", on_click=dialog.close).props("flat color=grey")
+                ui.button("Save", on_click=save).props("color=primary")
+        dialog.open()
 
     def do_search(query: str):
         if not query.strip():

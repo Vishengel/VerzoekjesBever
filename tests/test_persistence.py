@@ -130,6 +130,33 @@ def test_has_session(tmp_path: Path):
     assert store.has_session
 
 
+def test_update_requester_in_queue(tmp_path: Path):
+    store = QueueStore(tmp_path / "session.json")
+    store.start_session("Party", "dev1")
+    store.add_to_queue(_make_item("Song1", requester="Typo"))
+    store.update_requester("spotify:track:Song1", "Corrected")
+    assert store.queue[0].requester == "Corrected"
+
+
+def test_update_requester_currently_playing(tmp_path: Path):
+    store = QueueStore(tmp_path / "session.json")
+    store.start_session("Party", "dev1")
+    item = _make_item("Song1", requester="Typo")
+    store.set_currently_playing(item, PlaybackState.PLAYING)
+    store.update_requester("spotify:track:Song1", "Fixed")
+    assert store.currently_playing.requester == "Fixed"
+
+
+def test_update_requester_persists(tmp_path: Path):
+    path = tmp_path / "session.json"
+    store = QueueStore(path)
+    store.start_session("Party", "dev1")
+    store.add_to_queue(_make_item("Song1", requester="Old"))
+    store.update_requester("spotify:track:Song1", "New")
+    store2 = QueueStore(path)
+    assert store2.queue[0].requester == "New"
+
+
 def test_file_created_on_mutation(tmp_path: Path):
     path = tmp_path / "session.json"
     store = QueueStore(path)

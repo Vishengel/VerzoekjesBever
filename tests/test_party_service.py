@@ -225,6 +225,32 @@ def test_set_beaver_enabled(service):
     assert service.beaver_enabled is True
 
 
+def test_update_requester(service, mock_spotify):
+    service.start_session("Party", "dev1")
+    service.add_song(track=_track_dict(uri="spotify:track:s1"), requester="Typo")
+    v = service.version
+    service.update_requester("spotify:track:s1", "Fixed")
+    assert service.get_queue()[0].requester == "Fixed"
+    assert service.version > v
+
+
+def test_get_known_requesters(service, mock_spotify):
+    service.start_session("Party", "dev1")
+    service.add_song(track=_track_dict("S1", uri="spotify:track:s1"), requester="Alice")
+    service.add_song(track=_track_dict("S2", uri="spotify:track:s2"), requester="Bob")
+    service.add_song(track=_track_dict("S3", uri="spotify:track:s3"), requester="Alice")
+    assert service.get_known_requesters() == ["Alice", "Bob"]
+
+
+def test_get_known_requesters_includes_currently_playing(service, mock_spotify):
+    service.start_session("Party", "dev1")
+    service.add_song(track=_track_dict("S1", uri="spotify:track:s1"), requester="Charlie")
+    service.add_song(track=_track_dict("S2", uri="spotify:track:s2"), requester="Dana")
+    service.play_next()
+    assert "Charlie" in service.get_known_requesters()
+    assert "Dana" in service.get_known_requesters()
+
+
 def test_session_persists_across_restart(service, mock_spotify, tmp_path):
     service.start_session("Party", "dev1")
     service.add_song(track=_track_dict("Song1", uri="spotify:track:s1"), requester="Lisa")

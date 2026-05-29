@@ -107,6 +107,19 @@ class PartyService:
         self._store.set_device(device_id)
         self._bump_version()
 
+    def update_requester(self, track_uri: str, requester: str) -> None:
+        self._store.update_requester(track_uri, requester)
+        self._bump_version()
+
+    def get_known_requesters(self) -> list[str]:
+        names: set[str] = set()
+        if self._store.currently_playing and self._store.currently_playing.requester:
+            names.add(self._store.currently_playing.requester)
+        for item in self._store.queue:
+            if item.requester:
+                names.add(item.requester)
+        return sorted(names)
+
     def get_devices(self) -> list[dict]:
         return self._spotify.get_devices()
 

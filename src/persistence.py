@@ -65,6 +65,17 @@ class QueueStore:
         self.playback_state = state
         self._save()
 
+    def update_requester(self, track_uri: str, requester: str) -> None:
+        if self.currently_playing and self.currently_playing.track_uri == track_uri:
+            self.currently_playing.requester = requester
+            self._save()
+            return
+        for item in self.queue:
+            if item.track_uri == track_uri:
+                item.requester = requester
+                self._save()
+                return
+
     def set_device(self, device_id: str) -> None:
         self.device_id = device_id
         self._save()
