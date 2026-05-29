@@ -190,6 +190,41 @@ def test_poll_no_playback_state(service, mock_spotify):
     assert service.playback_state == PlaybackState.IDLE
 
 
+def test_play_next_bumps_skip_version(service, mock_spotify):
+    service.start_session("Party", "dev1")
+    service.add_song(track=_track_dict(), requester="Lisa")
+    assert service.last_skip_version == 0
+    service.play_next()
+    assert service.last_skip_version == 1
+
+
+def test_poll_track_end_does_not_bump_skip_version(service, mock_spotify):
+    service.start_session("Party", "dev1")
+    service.add_song(track=_track_dict("Song1", uri="spotify:track:s1"), requester="Lisa")
+    service.add_song(track=_track_dict("Song2", uri="spotify:track:s2"), requester="Mark")
+    service.play_next()
+    skip_v = service.last_skip_version
+
+    mock_spotify.get_playback_state.return_value = {
+        "is_playing": False,
+        "item": {"uri": "spotify:track:s1", "duration_ms": 200000},
+        "progress_ms": 199000,
+    }
+    service.poll_playback()
+    assert service.last_skip_version == skip_v
+
+
+def test_beaver_enabled_default_true(service):
+    assert service.beaver_enabled is True
+
+
+def test_set_beaver_enabled(service):
+    service.set_beaver_enabled(False)
+    assert service.beaver_enabled is False
+    service.set_beaver_enabled(True)
+    assert service.beaver_enabled is True
+
+
 def test_session_persists_across_restart(service, mock_spotify, tmp_path):
     service.start_session("Party", "dev1")
     service.add_song(track=_track_dict("Song1", uri="spotify:track:s1"), requester="Lisa")

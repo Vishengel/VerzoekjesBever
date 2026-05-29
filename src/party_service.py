@@ -19,6 +19,8 @@ class PartyService:
         self._spotify = spotify
         self._store = store
         self._version: int = 0
+        self._last_skip_version: int = 0
+        self._beaver_enabled: bool = True
 
     @property
     def spotify(self) -> SpotifyClient:
@@ -43,6 +45,17 @@ class PartyService:
     @property
     def playback_state(self) -> PlaybackState:
         return self._store.playback_state
+
+    @property
+    def last_skip_version(self) -> int:
+        return self._last_skip_version
+
+    @property
+    def beaver_enabled(self) -> bool:
+        return self._beaver_enabled
+
+    def set_beaver_enabled(self, enabled: bool) -> None:
+        self._beaver_enabled = enabled
 
     def start_session(self, name: str, device_id: str) -> None:
         self._store.start_session(name, device_id)
@@ -77,6 +90,7 @@ class PartyService:
             return
         self._spotify.play_track(item.track_uri, device_id=self._store.device_id)
         self._store.set_currently_playing(item, PlaybackState.PLAYING)
+        self._last_skip_version += 1
         self._bump_version()
 
     def pause(self) -> None:
