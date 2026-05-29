@@ -21,6 +21,17 @@ def dj_page():
             with ui.row().classes("w-full items-center justify-between"):
                 ui.label("🦫 VerzoekjesBever — DJ").classes("text-2xl font-bold")
                 with ui.row().classes("gap-2"):
+
+                    @ui.refreshable
+                    def beaver_toggle():
+                        enabled = svc.beaver_enabled
+                        ui.button(
+                            "🦫 Beaver ON" if enabled else "🚫 Beaver OFF",
+                            on_click=lambda: (svc.set_beaver_enabled(not enabled), beaver_toggle.refresh()),
+                        ).props(f"{'color=positive' if enabled else 'color=negative'} dense")
+
+                    beaver_toggle()
+
                     ui.button(
                         "Display",
                         on_click=lambda: ui.run_javascript("window.open('/display', '_blank')"),
