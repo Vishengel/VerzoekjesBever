@@ -67,8 +67,12 @@ def dj_page():
                             with ui.column().classes("flex-grow gap-0"):
                                 ui.label(item.track_name).classes("font-semibold")
                                 ui.label(item.artist).classes("text-sm text-gray-400")
-                            if item.requester:
-                                ui.label(item.requester).classes("text-sm text-orange-400")
+                                if item.requester:
+                                    ui.label(f"🎤 {item.requester}").classes("text-xs text-orange-400 mt-0.5")
+                            ui.button(
+                                icon="delete",
+                                on_click=lambda uri=item.track_uri: remove_queued(uri),
+                            ).props("color=negative flat round dense")
 
             queue_display()
 
@@ -129,4 +133,9 @@ def dj_page():
     def remove_current():
         svc.remove_currently_playing()
         ui.notify("Removed currently playing track", type="info")
+        queue_display.refresh()
+
+    def remove_queued(track_uri: str):
+        svc.remove_from_queue(track_uri)
+        ui.notify("Removed from queue", type="info")
         queue_display.refresh()

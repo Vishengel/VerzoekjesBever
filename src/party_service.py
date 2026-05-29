@@ -2,13 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import date
-from typing import TYPE_CHECKING
-
 from models import QueueItem
 from persistence import RequesterMap
-
-if TYPE_CHECKING:
-    from spotify_client import SpotifyClient
+from spotify_client import SpotifyClient
 
 
 class PartyService:
@@ -20,6 +16,10 @@ class PartyService:
         self._subscribers: list[Callable] = []
         self._version: int = 0
         self.playlist_id: str | None = None
+
+    @property
+    def spotify(self) -> SpotifyClient:
+        return self._spotify
 
     @property
     def version(self) -> int:
@@ -55,6 +55,15 @@ class PartyService:
         self._spotify.remove_track_from_playlist(self.playlist_id, self._currently_playing.track_uri)
         self._requester_map.remove(self._currently_playing.track_uri)
         self._currently_playing = None
+        self._bump_version()
+
+    def remove_from_queue(self, track_uri: str) -> None:
+        item = next((q for q in self._queue if q.track_uri == track_uri), None)
+        if item is None:
+            return
+        self._spotify.remove_track_from_playlist(self.playlist_id, track_uri)
+        self._requester_map.remove(track_uri)
+        self._queue = [q for q in self._queue if q.track_uri != track_uri]
         self._bump_version()
 
     def get_queue(self) -> list[QueueItem]:

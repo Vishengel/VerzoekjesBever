@@ -6,9 +6,9 @@ from main import get_service
 @ui.page("/setup", title="VerzoekjesBever — Setup", dark=True)
 def setup_page():
     svc = get_service()
-    spotify = svc._spotify
+    spotify = svc.spotify
 
-    playlists = spotify.fetch_all_playlists(spotify.current_user_id)
+    playlists = spotify.fetch_session_playlists()
     playlist_options = {p["id"]: p["name"] for p in playlists}
 
     with ui.column().classes("w-full max-w-lg mx-auto mt-16 gap-6"):
@@ -28,7 +28,7 @@ def setup_page():
 
         ui.separator()
 
-        ui.label("Or pick an existing playlist").classes("text-lg font-semibold")
+        ui.label("Or resume a previous session").classes("text-lg font-semibold")
         selected = ui.select(
             options=playlist_options,
             label="Select playlist",

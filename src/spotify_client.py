@@ -17,6 +17,7 @@ class SpotifyClient(Spotify):
     ]
     GET_ITEM_LIMIT: ClassVar[int] = 50
     PUT_ITEM_LIMIT: ClassVar[int] = 100
+    SESSION_IDENTIFIER: ClassVar[str] = "Managed by VerzoekjesBever"
 
     def __init__(self):
         super().__init__(
@@ -44,7 +45,9 @@ class SpotifyClient(Spotify):
         return None
 
     def create_playlist(self, name: str) -> dict:
-        return self.user_playlist_create(self.current_user_id, name, public=False)
+        return self.user_playlist_create(
+            self.current_user_id, name, public=False, description=self.SESSION_IDENTIFIER,
+        )
 
     def add_track_to_playlist(self, playlist_id: str, track_uri: str, position: int | None = None) -> None:
         self.playlist_add_items(playlist_id, [track_uri], position=position)
@@ -54,6 +57,10 @@ class SpotifyClient(Spotify):
 
     def fetch_all_playlists(self, user_id: str) -> list[dict]:
         return self._fetch_paginated_items(self.user_playlists, user_id, limit=self.GET_ITEM_LIMIT)
+
+    def fetch_session_playlists(self) -> list[dict]:
+        all_playlists = self.fetch_all_playlists(self.current_user_id)
+        return [p for p in all_playlists if self.SESSION_IDENTIFIER in (p.get("description") or "")]
 
     def fetch_tracks_for_playlist(self, playlist_id: str) -> list[dict]:
         return self._fetch_paginated_items(self.playlist_items, playlist_id, limit=self.GET_ITEM_LIMIT)

@@ -1,25 +1,26 @@
 from pathlib import Path
+from typing import ClassVar
 
 from pydantic import SecretStr
-from pydantic_settings import SettingsConfigDict
-
-from base_config import BaseConfig
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Config(BaseConfig):
-    package_root: Path = Path(__file__).parent
+class Config(BaseSettings):
+    project_root: ClassVar[Path] = Path(__file__).parent.parent
+    cache_dir: ClassVar[Path] = project_root / "cache"
+
+    cache_dir.mkdir(parents=True, exist_ok=True)
 
     spotipy_client_id: str
     spotipy_client_secret: SecretStr
     spotipy_redirect_uri: str
 
+    requester_map_path: Path = project_root / "database.json"
+
     model_config = SettingsConfigDict(
-        env_file=BaseConfig.project_root / ".env", env_file_encoding="utf-8", env_ignore_empty=True, extra="ignore"
+        env_file=project_root / ".env",
+        env_file_encoding="utf-8",
+        env_ignore_empty=True,
     )
-
-    @property
-    def requester_map_path(self) -> Path:
-        return self.cache_dir / "requester_map.json"
-
 
 CONFIG = Config()

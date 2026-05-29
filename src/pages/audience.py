@@ -58,8 +58,8 @@ def audience_page():
                             with ui.column().classes("flex-grow gap-0"):
                                 ui.label(item.track_name).classes("text-white font-semibold text-base")
                                 ui.label(item.artist).classes("text-gray-400 text-sm")
-                            if item.requester:
-                                ui.label(item.requester).classes("text-orange-400 text-sm")
+                                if item.requester:
+                                    ui.label(f"🎤 {item.requester}").classes("text-orange-400 text-xs mt-0.5")
 
         playlist_display()
 
