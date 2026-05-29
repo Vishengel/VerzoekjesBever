@@ -1,21 +1,24 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from datetime import date
-from models import QueueItem
-from persistence import RequesterMap
-from spotify_client import SpotifyClient
+import logging
+from typing import TYPE_CHECKING
+
+from models import PlaybackState, QueueItem
+from persistence import QueueStore
+
+if TYPE_CHECKING:
+    from spotify_client import SpotifyClient
+
+logger = logging.getLogger(__name__)
+
+TRACK_END_THRESHOLD_MS = 5000
 
 
 class PartyService:
-    def __init__(self, spotify: SpotifyClient, requester_map: RequesterMap):
+    def __init__(self, spotify: SpotifyClient, store: QueueStore):
         self._spotify = spotify
-        self._requester_map = requester_map
-        self._queue: list[QueueItem] = []
-        self._currently_playing: QueueItem | None = None
-        self._subscribers: list[Callable] = []
+        self._store = store
         self._version: int = 0
-        self.playlist_id: str | None = None
 
     @property
     def spotify(self) -> SpotifyClient:
@@ -25,14 +28,25 @@ class PartyService:
     def version(self) -> int:
         return self._version
 
-    def start_session(self, playlist_id: str | None, playlist_name: str | None = None) -> None:
-        if playlist_id is None:
-            name = playlist_name or f"VerzoekjesBever — {date.today().strftime('%d %B %Y')}"
-            result = self._spotify.create_playlist(name)
-            self.playlist_id = result["id"]
-        else:
-            self.playlist_id = playlist_id
-            self._load_queue_from_spotify()
+    @property
+    def has_session(self) -> bool:
+        return self._store.has_session
+
+    @property
+    def session_name(self) -> str | None:
+        return self._store.session_name
+
+    @property
+    def device_id(self) -> str | None:
+        return self._store.device_id
+
+    @property
+    def playback_state(self) -> PlaybackState:
+        return self._store.playback_state
+
+    def start_session(self, name: str, device_id: str) -> None:
+        self._store.start_session(name, device_id)
+        self._bump_version()
 
     def search_songs(self, query: str) -> list[QueueItem]:
         tracks = self._spotify.search_tracks(query)
@@ -40,71 +54,74 @@ class PartyService:
 
     def add_song(self, track: dict, requester: str, top: bool = False) -> None:
         item = QueueItem.from_spotify_track(track, requester=requester)
-        position = 0 if top else None
-        self._spotify.add_track_to_playlist(self.playlist_id, item.track_uri, position=position)
-        if top:
-            self._queue.insert(0, item)
-        else:
-            self._queue.append(item)
-        self._requester_map.add(item.track_uri, requester)
-        self._bump_version()
-
-    def remove_currently_playing(self) -> None:
-        if self._currently_playing is None:
-            return
-        self._spotify.remove_track_from_playlist(self.playlist_id, self._currently_playing.track_uri)
-        self._requester_map.remove(self._currently_playing.track_uri)
-        self._currently_playing = None
+        self._store.add_to_queue(item, top=top)
         self._bump_version()
 
     def remove_from_queue(self, track_uri: str) -> None:
-        item = next((q for q in self._queue if q.track_uri == track_uri), None)
-        if item is None:
-            return
-        self._spotify.remove_track_from_playlist(self.playlist_id, track_uri)
-        self._requester_map.remove(track_uri)
-        self._queue = [q for q in self._queue if q.track_uri != track_uri]
+        self._store.remove_from_queue(track_uri)
+        self._bump_version()
+
+    def move_to_top(self, track_uri: str) -> None:
+        self._store.move_to_top(track_uri)
         self._bump_version()
 
     def get_queue(self) -> list[QueueItem]:
-        return list(self._queue)
+        return list(self._store.queue)
 
     def get_currently_playing(self) -> QueueItem | None:
-        return self._currently_playing
+        return self._store.currently_playing
 
-    def subscribe(self, callback: Callable) -> None:
-        self._subscribers.append(callback)
+    def play_next(self) -> None:
+        item = self._store.pop_next()
+        if item is None:
+            return
+        self._spotify.play_track(item.track_uri, device_id=self._store.device_id)
+        self._store.set_currently_playing(item, PlaybackState.PLAYING)
+        self._bump_version()
 
-    def poll_currently_playing(self) -> None:
-        track = self._spotify.get_currently_playing_track()
-        if track is None:
-            if self._currently_playing is not None:
-                self._currently_playing = None
+    def pause(self) -> None:
+        self._spotify.pause(device_id=self._store.device_id)
+        self._store.set_playback_state(PlaybackState.PAUSED)
+        self._bump_version()
+
+    def resume(self) -> None:
+        self._spotify.resume(device_id=self._store.device_id)
+        self._store.set_playback_state(PlaybackState.PLAYING)
+        self._bump_version()
+
+    def set_device(self, device_id: str) -> None:
+        self._store.set_device(device_id)
+        self._bump_version()
+
+    def get_devices(self) -> list[dict]:
+        return self._spotify.get_devices()
+
+    def poll_playback(self) -> None:
+        if self._store.playback_state == PlaybackState.IDLE:
+            return
+
+        state = self._spotify.get_playback_state()
+        if state is None:
+            if self._store.currently_playing is not None:
+                self._store.clear_currently_playing()
                 self._bump_version()
             return
 
-        new_uri = track["uri"]
-        if self._currently_playing and self._currently_playing.track_uri == new_uri:
-            return
+        is_playing = state.get("is_playing", False)
+        item = state.get("item")
+        progress = state.get("progress_ms", 0)
+        duration = item.get("duration_ms", 0) if item else 0
 
-        requesters = self._requester_map.get(new_uri)
-        requester = requesters[0] if requesters else ""
-        self._currently_playing = QueueItem.from_spotify_track(track, requester=requester)
-        self._queue = [q for q in self._queue if q.track_uri != new_uri]
-        self._bump_version()
+        track_ended = not is_playing and duration > 0 and (duration - progress) < TRACK_END_THRESHOLD_MS
 
-    def _load_queue_from_spotify(self) -> None:
-        items = self._spotify.fetch_tracks_for_playlist(self.playlist_id)
-        self._queue = []
-        for item in items:
-            track = item.get("track")
-            if track is None:
-                continue
-            requesters = self._requester_map.get(track["uri"])
-            requester = requesters[0] if requesters else ""
-            self._queue.append(QueueItem.from_spotify_track(track, requester=requester))
+        if track_ended:
+            next_item = self._store.pop_next()
+            if next_item:
+                self._spotify.play_track(next_item.track_uri, device_id=self._store.device_id)
+                self._store.set_currently_playing(next_item, PlaybackState.PLAYING)
+            else:
+                self._store.clear_currently_playing()
+            self._bump_version()
 
     def _bump_version(self) -> None:
         self._version += 1
-        for callback in self._subscribers:
-            callback()
