@@ -15,7 +15,7 @@ class Config(BaseSettings):
     spotipy_client_secret: SecretStr
     spotipy_redirect_uri: str
 
-    requester_map_path: Path = project_root / "database.json"
+    queue_store_path: Path = project_root / "session.json"
 
     model_config = SettingsConfigDict(
         env_file=project_root / ".env",
