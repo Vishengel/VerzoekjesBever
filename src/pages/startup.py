@@ -20,6 +20,20 @@ def setup_page():
 
         ui.separator()
 
+        if not svc.is_authenticated():
+            with ui.card().classes("w-full bg-orange-900/30 border border-orange-700"):
+                ui.label("Spotify not connected").classes(
+                    "text-lg font-semibold text-orange-400"
+                )
+                ui.label(
+                    "Connect your Spotify account to start playing music."
+                ).classes("text-gray-400")
+                ui.button(
+                    "Connect to Spotify",
+                    on_click=lambda: ui.navigate.to(svc.get_auth_url(), new_tab=False),
+                ).props("color=positive").classes("w-full mt-2")
+            return
+
         if svc.has_session:
             with ui.card().classes("w-full bg-green-900/30 border border-green-700"):
                 ui.label("Previous session found").classes(
