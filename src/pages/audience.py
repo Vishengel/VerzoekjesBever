@@ -35,6 +35,8 @@ def audience_page():
                 ui.label("Check back soon!").classes("text-gray-500")
             return
 
+        pending_add = {"uri": None, "top": False}
+
         @ui.refreshable
         def playlist_display():
             current = svc.get_currently_playing()
@@ -118,7 +120,6 @@ def audience_page():
         local_version = {"v": svc.version}
         local_skip_version = {"v": svc.last_skip_version}
         local_add_version = {"v": svc.last_add_version}
-        pending_add = {"uri": None, "top": False}
 
         async def check_updates():
             if svc.version != local_version["v"]:

@@ -7,13 +7,11 @@ from nicegui import app, background_tasks, ui
 from spotipy.exceptions import SpotifyException
 
 from deps import get_service
+from pages import audience, dj, startup  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
 app.add_static_files("/static", str(Path(__file__).parent / "static"))
-
-# Import pages to register routes
-from pages import audience, dj, startup  # noqa: E402, F401
 
 
 async def poll_loop() -> None:
