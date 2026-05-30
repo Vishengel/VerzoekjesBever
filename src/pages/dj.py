@@ -5,6 +5,7 @@ from nicegui import app, ui
 from config import CONFIG
 from deps import get_service
 from models import PlaybackState, QueueItem
+from party_service import PartyService
 
 
 @ui.page("/dj", title="VerzoekjesBever - DJ", dark=True)
@@ -22,7 +23,7 @@ def dj_page():
 
 
 class DJPage:
-    def __init__(self, svc):
+    def __init__(self, svc: PartyService):
         self.svc = svc
         self._requester_input: ui.input | None = None
         self._search_results: ui.column | None = None

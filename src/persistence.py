@@ -12,91 +12,115 @@ logger = logging.getLogger(__name__)
 class QueueStore:
     def __init__(self, path: Path):
         self._path = path
-        self.session_name: str | None = None
-        self.device_id: str | None = None
-        self.playback_state: PlaybackState = PlaybackState.IDLE
-        self.currently_playing: QueueItem | None = None
-        self.queue: list[QueueItem] = []
-        self.demo_queue_active: bool = False
+        self._session_name: str | None = None
+        self._device_id: str | None = None
+        self._playback_state: PlaybackState = PlaybackState.IDLE
+        self._currently_playing: QueueItem | None = None
+        self._queue: list[QueueItem] = []
+        self._demo_queue_active: bool = False
         self._load()
 
     @property
     def has_session(self) -> bool:
-        return self.session_name is not None
+        return self._session_name is not None
+
+    @property
+    def session_name(self) -> str | None:
+        return self._session_name
+
+    @property
+    def device_id(self) -> str | None:
+        return self._device_id
+
+    @property
+    def playback_state(self) -> PlaybackState:
+        return self._playback_state
+
+    @property
+    def currently_playing(self) -> QueueItem | None:
+        return self._currently_playing
+
+    @property
+    def queue(self) -> list[QueueItem]:
+        return list(self._queue)
+
+    @property
+    def demo_queue_active(self) -> bool:
+        return self._demo_queue_active
 
     def start_session(self, name: str, device_id: str) -> None:
-        self.session_name = name
-        self.device_id = device_id
-        self.playback_state = PlaybackState.IDLE
-        self.currently_playing = None
-        self.queue = []
-        self.demo_queue_active = False
+        self._session_name = name
+        self._device_id = device_id
+        self._playback_state = PlaybackState.IDLE
+        self._currently_playing = None
+        self._queue = []
+        self._demo_queue_active = False
         self._save()
 
     def add_to_queue(self, item: QueueItem, top: bool = False) -> None:
         item = replace(item, uid=uuid4().hex[:8])
         if top:
-            self.queue.insert(0, item)
+            self._queue.insert(0, item)
         else:
-            self.queue.append(item)
+            self._queue.append(item)
         self._save()
 
     def remove_from_queue(self, uid: str) -> None:
-        self.queue = [q for q in self.queue if q.uid != uid]
+        self._queue = [q for q in self._queue if q.uid != uid]
         self._save()
 
     def pop_next(self) -> QueueItem | None:
-        if not self.queue:
+        if not self._queue:
             return None
-        item = self.queue.pop(0)
+        item = self._queue.pop(0)
         self._save()
         return item
 
     def clear_queue(self) -> None:
-        self.queue = []
+        self._queue = []
         self._save()
 
     def move_to_top(self, uid: str) -> None:
-        item = next((q for q in self.queue if q.uid == uid), None)
+        item = next((q for q in self._queue if q.uid == uid), None)
         if item is None:
             return
-        self.queue = [item] + [q for q in self.queue if q.uid != uid]
+        self._queue = [item] + [q for q in self._queue if q.uid != uid]
         self._save()
 
     def move_up(self, uid: str) -> None:
-        idx = next((i for i, q in enumerate(self.queue) if q.uid == uid), None)
+        idx = next((i for i, q in enumerate(self._queue) if q.uid == uid), None)
         if idx is None or idx == 0:
             return
-        self.queue[idx], self.queue[idx - 1] = self.queue[idx - 1], self.queue[idx]
+        self._queue[idx], self._queue[idx - 1] = self._queue[idx - 1], self._queue[idx]
         self._save()
 
     def move_down(self, uid: str) -> None:
-        idx = next((i for i, q in enumerate(self.queue) if q.uid == uid), None)
-        if idx is None or idx == len(self.queue) - 1:
+        idx = next((i for i, q in enumerate(self._queue) if q.uid == uid), None)
+        if idx is None or idx == len(self._queue) - 1:
             return
-        self.queue[idx], self.queue[idx + 1] = self.queue[idx + 1], self.queue[idx]
+        self._queue[idx], self._queue[idx + 1] = self._queue[idx + 1], self._queue[idx]
         self._save()
 
     def set_currently_playing(self, item: QueueItem, state: PlaybackState) -> None:
-        self.currently_playing = item
-        self.playback_state = state
+        self._currently_playing = item
+        self._playback_state = state
         self._save()
 
     def clear_currently_playing(self) -> None:
-        self.currently_playing = None
-        self.playback_state = PlaybackState.IDLE
+        self._currently_playing = None
+        self._playback_state = PlaybackState.IDLE
         self._save()
 
     def set_playback_state(self, state: PlaybackState) -> None:
-        self.playback_state = state
+        self._playback_state = state
         self._save()
 
     def update_requester(self, uid: str, requester: str) -> None:
-        if self.currently_playing and self.currently_playing.uid == uid:
-            self.currently_playing.requester = requester
+        if self._currently_playing and self._currently_playing.uid == uid:
+            self._currently_playing.requester = requester
             self._save()
             return
-        for item in self.queue:
+        for item in self._queue:
             if item.uid == uid:
                 item.requester = requester
                 self._save()
@@ -104,19 +128,19 @@ class QueueStore:
 
     def get_known_requesters(self) -> list[str]:
         names: set[str] = set()
-        if self.currently_playing and self.currently_playing.requester:
-            names.add(self.currently_playing.requester)
-        for item in self.queue:
+        if self._currently_playing and self._currently_playing.requester:
+            names.add(self._currently_playing.requester)
+        for item in self._queue:
             if item.requester:
                 names.add(item.requester)
         return sorted(names)
 
     def set_demo_queue_active(self, active: bool) -> None:
-        self.demo_queue_active = active
+        self._demo_queue_active = active
         self._save()
 
     def set_device(self, device_id: str) -> None:
-        self.device_id = device_id
+        self._device_id = device_id
         self._save()
 
     def _load(self) -> None:
@@ -127,25 +151,25 @@ class QueueStore:
         except (json.JSONDecodeError, ValueError):
             logger.warning("Corrupt session file at %s, starting fresh", self._path)
             return
-        self.session_name = data.get("session_name")
-        self.device_id = data.get("device_id")
-        self.playback_state = PlaybackState(data.get("playback_state", "idle"))
+        self._session_name = data.get("session_name")
+        self._device_id = data.get("device_id")
+        self._playback_state = PlaybackState(data.get("playback_state", "idle"))
         cp = data.get("currently_playing")
-        self.currently_playing = QueueItem.from_dict(cp) if cp else None
-        self.queue = [QueueItem.from_dict(q) for q in data.get("queue", [])]
-        self.demo_queue_active = data.get("demo_queue_active", False)
+        self._currently_playing = QueueItem.from_dict(cp) if cp else None
+        self._queue = [QueueItem.from_dict(q) for q in data.get("queue", [])]
+        self._demo_queue_active = data.get("demo_queue_active", False)
 
     def _save(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         data = {
-            "session_name": self.session_name,
-            "device_id": self.device_id,
-            "playback_state": self.playback_state.value,
-            "currently_playing": self.currently_playing.to_dict()
-            if self.currently_playing
+            "session_name": self._session_name,
+            "device_id": self._device_id,
+            "playback_state": self._playback_state.value,
+            "currently_playing": self._currently_playing.to_dict()
+            if self._currently_playing
             else None,
-            "queue": [q.to_dict() for q in self.queue],
-            "demo_queue_active": self.demo_queue_active,
+            "queue": [q.to_dict() for q in self._queue],
+            "demo_queue_active": self._demo_queue_active,
         }
         tmp = self._path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=2))

@@ -11,13 +11,11 @@ from deps import get_service
 
 def _get_local_ip() -> str:
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
     except OSError:
-        ip = "127.0.0.1"
-    return ip
+        return "127.0.0.1"
 
 
 def _generate_qr_svg(url: str) -> str:
