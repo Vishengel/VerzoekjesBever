@@ -31,3 +31,61 @@ function triggerBeaverAnimation() {
         wrapper.classList.remove(pick);
     }, 2200);
 }
+
+function triggerBeaverAddAnimation(isPriority) {
+    var wrapper = document.querySelector('.queue-add-target');
+    if (!wrapper) return;
+
+    var card = wrapper.querySelector('.beaver-incoming');
+    if (!card) return;
+
+    var existing = document.querySelector('.beaver-add-overlay');
+    if (existing) existing.remove();
+
+    var variants = ['carry', 'toss', 'build'];
+    var pick = variants[Math.floor(Math.random() * variants.length)];
+    var duration = isPriority ? 1.5 : 2.2;
+
+    var keyframes = {
+        carry: { beaver: 'carry-beaver-slide', card: 'carry-card-reveal' },
+        toss: { beaver: 'toss-beaver-popup', card: 'toss-card-reveal' },
+        build: { beaver: 'build-beaver-hammer', card: 'build-card-reveal' }
+    };
+
+    var overlay = document.createElement('div');
+    overlay.className = 'beaver-add-overlay beaver-add-' + pick;
+
+    var beaver = document.createElement('span');
+    beaver.className = 'beaver-actor';
+    beaver.style.animation = keyframes[pick].beaver + ' ' + duration + 's ease-in-out forwards';
+    if (isPriority) {
+        beaver.textContent = '🦫👑';
+    } else if (pick === 'build') {
+        beaver.textContent = '🦫🪖';
+    } else {
+        beaver.textContent = '🦫';
+    }
+    overlay.appendChild(beaver);
+    wrapper.appendChild(overlay);
+
+    card.style.animation = keyframes[pick].card + ' ' + duration + 's ease-in-out forwards';
+
+    var cleanupDelay = (duration + 0.2) * 1000;
+
+    if (isPriority) {
+        setTimeout(function() {
+            card.classList.remove('beaver-incoming');
+            card.style.animation = 'priority-glow 0.6s ease-in-out 3';
+            setTimeout(function() {
+                card.style.animation = '';
+                overlay.remove();
+            }, 2000);
+        }, cleanupDelay);
+    } else {
+        setTimeout(function() {
+            card.classList.remove('beaver-incoming');
+            card.style.animation = '';
+            overlay.remove();
+        }, cleanupDelay);
+    }
+}
