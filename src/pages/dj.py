@@ -154,8 +154,7 @@ class DJPage:
             self._requester_input.value.strip() if self._requester_input.value else ""
         )
         if not requester:
-            ui.notify("Enter a requester name first", type="warning")
-            return
+            requester = "🦫 (anonymous)"
         self.svc.add_to_queue(replace(item, requester=requester), top=top)
         position = "top" if top else "queue"
         ui.notify(
