@@ -45,6 +45,7 @@ def main():
         dark=True,
         reload=reload,
         show=False,
+        host="0.0.0.0",
         port=8000,
         storage_secret=storage_secret,
     )
