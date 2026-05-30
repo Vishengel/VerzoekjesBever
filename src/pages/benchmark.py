@@ -69,7 +69,7 @@ def benchmark_page():
 
         with ui.row().classes("w-full gap-4"):
             ui.link("DJ Page", "/dj", new_tab=True).classes("text-blue-400 underline")
-            ui.link("Audience Page", "/audience", new_tab=True).classes(
+            ui.link("Audience Page", "/display", new_tab=True).classes(
                 "text-blue-400 underline"
             )
 
