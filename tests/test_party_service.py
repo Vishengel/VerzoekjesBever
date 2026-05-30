@@ -2,13 +2,16 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from spotipy.exceptions import SpotifyException
 
 from models import PlaybackState, QueueItem
 from party_service import PartyService
 from persistence import QueueStore
 
 
-def _make_item(name="Song", artist="Artist", uri="spotify:track:s1", requester="") -> QueueItem:
+def _make_item(
+    name="Song", artist="Artist", uri="spotify:track:s1", requester=""
+) -> QueueItem:
     return QueueItem(
         track_name=name,
         artist=artist,
@@ -58,7 +61,9 @@ def test_has_session(service):
 
 
 def test_search_songs(service, mock_spotify):
-    mock_spotify.search_tracks.return_value = [_track_dict("Dancing Queen", "ABBA", "spotify:track:dq")]
+    mock_spotify.search_tracks.return_value = [
+        _track_dict("Dancing Queen", "ABBA", "spotify:track:dq")
+    ]
     results = service.search_songs("Dancing Queen")
     pytest.assume(len(results) == 1)
     pytest.assume(results[0].track_name == "Dancing Queen")
@@ -75,7 +80,9 @@ def test_add_to_queue(service):
 def test_add_to_queue_top(service):
     service.start_session("Party", "dev1")
     service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
-    service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="Mark"), top=True)
+    service.add_to_queue(
+        _make_item("Song2", uri="spotify:track:s2", requester="Mark"), top=True
+    )
     pytest.assume(service.get_queue()[0].track_name == "Song2")
 
 
@@ -99,7 +106,9 @@ def test_play_next(service, mock_spotify):
     service.start_session("Party", "dev1")
     service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
     service.play_next()
-    mock_spotify.play_track.assert_called_once_with("spotify:track:s1", device_id="dev1")
+    mock_spotify.play_track.assert_called_once_with(
+        "spotify:track:s1", device_id="dev1"
+    )
     pytest.assume(service.get_currently_playing().track_name == "Song1")
     pytest.assume(service.playback_state == PlaybackState.PLAYING)
     pytest.assume(service.get_queue() == [])
@@ -284,7 +293,9 @@ def test_add_to_queue_tracks_top_flag(service):
     pytest.assume(service.last_add_was_top is False)
     service.add_to_queue(_make_item(requester="Lisa"), top=True)
     pytest.assume(service.last_add_was_top is True)
-    service.add_to_queue(_make_item("S2", uri="spotify:track:s2", requester="Mark"), top=False)
+    service.add_to_queue(
+        _make_item("S2", uri="spotify:track:s2", requester="Mark"), top=False
+    )
     pytest.assume(service.last_add_was_top is False)
 
 
@@ -305,3 +316,107 @@ def test_session_persists_across_restart(service, mock_spotify, tmp_path):
     pytest.assume(svc2.has_session)
     pytest.assume(len(svc2.get_queue()) == 1)
     pytest.assume(svc2.get_queue()[0].track_name == "Song1")
+
+
+# --- Playback desync bug fixes ---
+
+
+def test_poll_state_none_advances_queue(service, mock_spotify):
+    """DJ skips in Spotify, playback stops → app plays next from queue."""
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
+    service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="Mark"))
+    service.play_next()
+
+    mock_spotify.get_playback_state.return_value = None
+    service.poll_playback()
+
+    mock_spotify.play_track.assert_called_with("spotify:track:s2", device_id="dev1")
+    pytest.assume(service.get_currently_playing().track_name == "Song2")
+    pytest.assume(service.playback_state == PlaybackState.PLAYING)
+
+
+def test_poll_state_none_empty_queue_goes_idle(service, mock_spotify):
+    """Playback stops with empty queue → IDLE."""
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item(requester="Lisa"))
+    service.play_next()
+
+    mock_spotify.get_playback_state.return_value = None
+    service.poll_playback()
+
+    pytest.assume(service.get_currently_playing() is None)
+    pytest.assume(service.playback_state == PlaybackState.IDLE)
+
+
+def test_poll_state_none_play_fails_requeues(service, mock_spotify):
+    """Device unavailable → re-queue item instead of losing it."""
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
+    service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="Mark"))
+    service.play_next()
+
+    mock_spotify.get_playback_state.return_value = None
+    mock_spotify.play_track.side_effect = SpotifyException(
+        404, "https://api.spotify.com", msg="Device not found"
+    )
+    service.poll_playback()
+
+    pytest.assume(service.playback_state == PlaybackState.IDLE)
+    pytest.assume(len(service.get_queue()) == 1)
+    pytest.assume(service.get_queue()[0].track_name == "Song2")
+
+
+def test_poll_syncs_external_pause(service, mock_spotify):
+    """DJ pauses in Spotify app → app syncs to PAUSED."""
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item(requester="Lisa"))
+    service.play_next()
+
+    mock_spotify.get_playback_state.return_value = {
+        "is_playing": False,
+        "item": {"uri": "spotify:track:s1", "duration_ms": 200000},
+        "progress_ms": 100000,
+    }
+    service.poll_playback()
+
+    pytest.assume(service.playback_state == PlaybackState.PAUSED)
+
+
+def test_poll_syncs_external_resume(service, mock_spotify):
+    """DJ resumes in Spotify app → app syncs to PLAYING."""
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item(requester="Lisa"))
+    service.play_next()
+    service.pause()
+
+    mock_spotify.get_playback_state.return_value = {
+        "is_playing": True,
+        "item": {"uri": "spotify:track:s1", "duration_ms": 200000},
+        "progress_ms": 100000,
+    }
+    service.poll_playback()
+
+    pytest.assume(service.playback_state == PlaybackState.PLAYING)
+
+
+def test_poll_track_ended_play_fails_requeues(service, mock_spotify):
+    """Track ends naturally but next play fails → re-queue, don't lose song."""
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
+    service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="Mark"))
+    service.play_next()
+
+    mock_spotify.get_playback_state.return_value = {
+        "is_playing": False,
+        "item": {"uri": "spotify:track:s1", "duration_ms": 200000},
+        "progress_ms": 199000,
+    }
+    mock_spotify.play_track.side_effect = SpotifyException(
+        404, "https://api.spotify.com", msg="Device not found"
+    )
+    service.poll_playback()
+
+    pytest.assume(service.playback_state == PlaybackState.IDLE)
+    pytest.assume(len(service.get_queue()) == 1)
+    pytest.assume(service.get_queue()[0].track_name == "Song2")

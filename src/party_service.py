@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from spotipy.exceptions import SpotifyException
+
 from models import PlaybackState, QueueItem
 from persistence import QueueStore
 
@@ -145,8 +147,8 @@ class PartyService:
         state = self._spotify.get_playback_state()
         if state is None:
             if self._store.currently_playing is not None:
-                self._store.clear_currently_playing()
-                self._bump_version()
+                logger.info("Playback stopped externally, advancing queue")
+                self._advance_queue()
             return
 
         is_playing = state.get("is_playing", False)
@@ -161,15 +163,33 @@ class PartyService:
         )
 
         if track_ended:
-            next_item = self._store.pop_next()
-            if next_item:
+            self._advance_queue()
+            return
+
+        if is_playing and self._store.playback_state == PlaybackState.PAUSED:
+            logger.info("Playback resumed externally")
+            self._store.set_playback_state(PlaybackState.PLAYING)
+            self._bump_version()
+        elif not is_playing and self._store.playback_state == PlaybackState.PLAYING:
+            logger.info("Playback paused externally")
+            self._store.set_playback_state(PlaybackState.PAUSED)
+            self._bump_version()
+
+    def _advance_queue(self) -> None:
+        next_item = self._store.pop_next()
+        if next_item:
+            try:
                 self._spotify.play_track(
                     next_item.track_uri, device_id=self._store.device_id
                 )
                 self._store.set_currently_playing(next_item, PlaybackState.PLAYING)
-            else:
+            except SpotifyException:
+                logger.warning("Failed to start next track, re-queuing")
+                self._store.add_to_queue(next_item, top=True)
                 self._store.clear_currently_playing()
-            self._bump_version()
+        else:
+            self._store.clear_currently_playing()
+        self._bump_version()
 
     def _bump_version(self) -> None:
         self._version += 1
