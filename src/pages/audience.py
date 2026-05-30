@@ -1,9 +1,30 @@
 import asyncio
 import contextlib
+import io
+import socket
 
+import segno
 from nicegui import ui
 
 from deps import get_service
+
+
+def _get_local_ip() -> str:
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+    except OSError:
+        ip = "127.0.0.1"
+    return ip
+
+
+def _generate_qr_svg(url: str) -> str:
+    qr = segno.make(url)
+    buffer = io.BytesIO()
+    qr.save(buffer, kind="svg", dark="#4ade80", light=None, border=1, scale=6)
+    return buffer.getvalue().decode()
 
 
 @ui.page("/display", title="VerzoekjesBever", dark=True)
@@ -15,6 +36,7 @@ def audience_page():
     ui.add_head_html("""
     <style>
         body { background: linear-gradient(135deg, #0d0d1a 0%, #1a1a3e 100%) !important; }
+        @media (max-width: 768px) { .qr-overlay { display: none !important; } }
     </style>
     """)
 
@@ -117,6 +139,29 @@ def audience_page():
 
         playlist_display()
 
+        display_url = f"http://{_get_local_ip()}:8000/display"
+        qr_svg = _generate_qr_svg(display_url)
+
+        @ui.refreshable
+        def qr_overlay():
+            if svc.show_qr_code:
+                with (
+                    ui.element("div")
+                    .classes("qr-overlay")
+                    .style(
+                        "position: fixed; bottom: 24px; left: 24px; z-index: 100; "
+                        "background: rgba(255,255,255,0.06); backdrop-filter: blur(8px); "
+                        "border-radius: 16px; padding: 16px; text-align: center; "
+                        "display: flex; flex-direction: column; align-items: center;"
+                    )
+                ):
+                    ui.html(qr_svg)
+                    ui.label("Scan to follow along!").classes(
+                        "text-sm font-semibold text-green-400 mt-2"
+                    )
+
+        qr_overlay()
+
         local_version = {"v": svc.version}
         local_skip_version = {"v": svc.last_skip_version}
         local_add_version = {"v": svc.last_add_version}
@@ -144,6 +189,7 @@ def audience_page():
                     pending_add["top"] = svc.last_add_was_top
 
                 playlist_display.refresh()
+                qr_overlay.refresh()
 
                 if add_happened:
                     is_priority = pending_add["top"]

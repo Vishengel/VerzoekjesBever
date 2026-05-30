@@ -62,6 +62,21 @@ class DJPage:
 
                 beaver_toggle()
 
+                @ui.refreshable
+                def qr_toggle():
+                    enabled = self.svc.show_qr_code
+                    ui.button(
+                        "📱 QR ON" if enabled else "📱 QR OFF",
+                        on_click=lambda: (
+                            self.svc.set_show_qr_code(not enabled),
+                            qr_toggle.refresh(),
+                        ),
+                    ).props(
+                        f"{'color=positive' if enabled else 'color=negative'} dense"
+                    )
+
+                qr_toggle()
+
                 ui.button(
                     "Display",
                     on_click=lambda: ui.run_javascript(

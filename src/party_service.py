@@ -35,6 +35,7 @@ class PartyService:
         self._last_added_uri: str | None = None
         self._last_add_was_top: bool = False
         self._beaver_enabled: bool = True
+        self._show_qr_code: bool = False
 
     @property
     def spotify(self) -> SpotifyClient:
@@ -81,11 +82,19 @@ class PartyService:
         return self._beaver_enabled
 
     @property
+    def show_qr_code(self) -> bool:
+        return self._show_qr_code
+
+    @property
     def demo_queue_active(self) -> bool:
         return self._store.demo_queue_active
 
     def set_beaver_enabled(self, enabled: bool) -> None:
         self._beaver_enabled = enabled
+
+    def set_show_qr_code(self, enabled: bool) -> None:
+        self._show_qr_code = enabled
+        self._bump_version()
 
     def start_session(self, name: str, device_id: str, demo: bool = False) -> None:
         self._store.start_session(name, device_id)
