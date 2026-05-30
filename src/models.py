@@ -1,5 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
+from uuid import uuid4
 
 
 class PlaybackState(StrEnum):
@@ -15,6 +16,7 @@ class QueueItem:
     album_art_url: str
     requester: str
     track_uri: str
+    uid: str = field(default_factory=lambda: uuid4().hex[:8])
 
     def to_dict(self) -> dict:
         return {
@@ -23,6 +25,7 @@ class QueueItem:
             "album_art_url": self.album_art_url,
             "track_uri": self.track_uri,
             "requester": self.requester,
+            "uid": self.uid,
         }
 
     @classmethod
@@ -33,6 +36,7 @@ class QueueItem:
             album_art_url=data["album_art_url"],
             track_uri=data["track_uri"],
             requester=data["requester"],
+            uid=data.get("uid", uuid4().hex[:8]),
         )
 
     @classmethod

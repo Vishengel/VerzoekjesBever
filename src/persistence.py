@@ -1,6 +1,8 @@
 import json
 import logging
+from dataclasses import replace
 from pathlib import Path
+from uuid import uuid4
 
 from models import PlaybackState, QueueItem
 
@@ -15,6 +17,7 @@ class QueueStore:
         self.playback_state: PlaybackState = PlaybackState.IDLE
         self.currently_playing: QueueItem | None = None
         self.queue: list[QueueItem] = []
+        self.demo_queue_active: bool = False
         self._load()
 
     @property
@@ -27,17 +30,19 @@ class QueueStore:
         self.playback_state = PlaybackState.IDLE
         self.currently_playing = None
         self.queue = []
+        self.demo_queue_active = False
         self._save()
 
     def add_to_queue(self, item: QueueItem, top: bool = False) -> None:
+        item = replace(item, uid=uuid4().hex[:8])
         if top:
             self.queue.insert(0, item)
         else:
             self.queue.append(item)
         self._save()
 
-    def remove_from_queue(self, track_uri: str) -> None:
-        self.queue = [q for q in self.queue if q.track_uri != track_uri]
+    def remove_from_queue(self, uid: str) -> None:
+        self.queue = [q for q in self.queue if q.uid != uid]
         self._save()
 
     def pop_next(self) -> QueueItem | None:
@@ -51,26 +56,22 @@ class QueueStore:
         self.queue = []
         self._save()
 
-    def move_to_top(self, track_uri: str) -> None:
-        item = next((q for q in self.queue if q.track_uri == track_uri), None)
+    def move_to_top(self, uid: str) -> None:
+        item = next((q for q in self.queue if q.uid == uid), None)
         if item is None:
             return
-        self.queue = [item] + [q for q in self.queue if q.track_uri != track_uri]
+        self.queue = [item] + [q for q in self.queue if q.uid != uid]
         self._save()
 
-    def move_up(self, track_uri: str) -> None:
-        idx = next(
-            (i for i, q in enumerate(self.queue) if q.track_uri == track_uri), None
-        )
+    def move_up(self, uid: str) -> None:
+        idx = next((i for i, q in enumerate(self.queue) if q.uid == uid), None)
         if idx is None or idx == 0:
             return
         self.queue[idx], self.queue[idx - 1] = self.queue[idx - 1], self.queue[idx]
         self._save()
 
-    def move_down(self, track_uri: str) -> None:
-        idx = next(
-            (i for i, q in enumerate(self.queue) if q.track_uri == track_uri), None
-        )
+    def move_down(self, uid: str) -> None:
+        idx = next((i for i, q in enumerate(self.queue) if q.uid == uid), None)
         if idx is None or idx == len(self.queue) - 1:
             return
         self.queue[idx], self.queue[idx + 1] = self.queue[idx + 1], self.queue[idx]
@@ -90,13 +91,13 @@ class QueueStore:
         self.playback_state = state
         self._save()
 
-    def update_requester(self, track_uri: str, requester: str) -> None:
-        if self.currently_playing and self.currently_playing.track_uri == track_uri:
+    def update_requester(self, uid: str, requester: str) -> None:
+        if self.currently_playing and self.currently_playing.uid == uid:
             self.currently_playing.requester = requester
             self._save()
             return
         for item in self.queue:
-            if item.track_uri == track_uri:
+            if item.uid == uid:
                 item.requester = requester
                 self._save()
                 return
@@ -128,6 +129,7 @@ class QueueStore:
         cp = data.get("currently_playing")
         self.currently_playing = QueueItem.from_dict(cp) if cp else None
         self.queue = [QueueItem.from_dict(q) for q in data.get("queue", [])]
+        self.demo_queue_active = data.get("demo_queue_active", False)
 
     def _save(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -139,6 +141,7 @@ class QueueStore:
             if self.currently_playing
             else None,
             "queue": [q.to_dict() for q in self.queue],
+            "demo_queue_active": self.demo_queue_active,
         }
         tmp = self._path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=2))

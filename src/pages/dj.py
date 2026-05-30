@@ -249,9 +249,9 @@ class DJPage:
                         ).classes("text-sm text-orange-400")
                         ui.button(
                             icon="edit",
-                            on_click=lambda uri=current.track_uri,
+                            on_click=lambda uid=current.uid,
                             name=current.requester: self._open_edit_requester(
-                                uri, name
+                                uid, name
                             ),
                         ).props("flat round dense size=xs color=orange")
 
@@ -273,16 +273,16 @@ class DJPage:
                             )
                             ui.button(
                                 icon="edit",
-                                on_click=lambda uri=item.track_uri,
+                                on_click=lambda uid=item.uid,
                                 name=item.requester: self._open_edit_requester(
-                                    uri, name
+                                    uid, name
                                 ),
                             ).props("flat round dense size=xs color=orange")
                 with ui.column().classes("gap-0"):
                     up_btn = ui.button(
                         icon="arrow_upward",
-                        on_click=lambda uri=item.track_uri: (
-                            self.svc.move_up(uri),
+                        on_click=lambda uid=item.uid: (
+                            self.svc.move_up(uid),
                             self._queue_display.refresh(),
                         ),
                     ).props("flat round dense color=warning size=sm")
@@ -290,8 +290,8 @@ class DJPage:
                         up_btn.props(add="disable")
                     down_btn = ui.button(
                         icon="arrow_downward",
-                        on_click=lambda uri=item.track_uri: (
-                            self.svc.move_down(uri),
+                        on_click=lambda uid=item.uid: (
+                            self.svc.move_down(uid),
                             self._queue_display.refresh(),
                         ),
                     ).props("flat round dense color=warning size=sm")
@@ -299,8 +299,8 @@ class DJPage:
                         down_btn.props(add="disable")
                 ui.button(
                     icon="delete",
-                    on_click=lambda uri=item.track_uri: (
-                        self.svc.remove_from_queue(uri),
+                    on_click=lambda uid=item.uid: (
+                        self.svc.remove_from_queue(uid),
                         self._queue_display.refresh(),
                     ),
                 ).props("flat round dense color=negative")
@@ -315,7 +315,7 @@ class DJPage:
 
         ui.timer(1.0, check_updates)
 
-    def _open_edit_requester(self, track_uri: str, current_name: str):
+    def _open_edit_requester(self, uid: str, current_name: str):
         with ui.dialog() as dialog, ui.card().classes("bg-gray-900 min-w-[300px]"):
             ui.label("Edit requester").classes("text-lg font-bold")
             name_input = ui.input(
@@ -325,7 +325,7 @@ class DJPage:
             ).classes("w-full")
 
             def save():
-                self.svc.update_requester(track_uri, name_input.value.strip())
+                self.svc.update_requester(uid, name_input.value.strip())
                 self._queue_display.refresh()
                 dialog.close()
 
