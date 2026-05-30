@@ -228,7 +228,7 @@ class DJPage:
         if not queue:
             ui.label("No songs in queue yet").classes("text-gray-500 italic")
         for i, item in enumerate(queue):
-            self._render_queue_item(i, item)
+            self._render_queue_item(i, item, len(queue))
 
     def _render_now_playing(self, current: QueueItem):
         with ui.card().classes("w-full bg-gray-900 border-2 border-green-500"):
@@ -255,7 +255,7 @@ class DJPage:
                             ),
                         ).props("flat round dense size=xs color=orange")
 
-    def _render_queue_item(self, index: int, item: QueueItem):
+    def _render_queue_item(self, index: int, item: QueueItem, queue_len: int):
         with ui.card().classes("w-full bg-gray-900"):
             with ui.row().classes("items-center gap-3"):
                 ui.label(str(index + 1)).classes(
@@ -278,13 +278,25 @@ class DJPage:
                                     uri, name
                                 ),
                             ).props("flat round dense size=xs color=orange")
-                ui.button(
-                    icon="vertical_align_top",
-                    on_click=lambda uri=item.track_uri: (
-                        self.svc.move_to_top(uri),
-                        self._queue_display.refresh(),
-                    ),
-                ).props("flat round dense color=warning")
+                with ui.column().classes("gap-0"):
+                    up_btn = ui.button(
+                        icon="arrow_upward",
+                        on_click=lambda uri=item.track_uri: (
+                            self.svc.move_up(uri),
+                            self._queue_display.refresh(),
+                        ),
+                    ).props("flat round dense color=warning size=sm")
+                    if index == 0:
+                        up_btn.props(add="disable")
+                    down_btn = ui.button(
+                        icon="arrow_downward",
+                        on_click=lambda uri=item.track_uri: (
+                            self.svc.move_down(uri),
+                            self._queue_display.refresh(),
+                        ),
+                    ).props("flat round dense color=warning size=sm")
+                    if index == queue_len - 1:
+                        down_btn.props(add="disable")
                 ui.button(
                     icon="delete",
                     on_click=lambda uri=item.track_uri: (

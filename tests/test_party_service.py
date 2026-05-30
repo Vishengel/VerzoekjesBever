@@ -102,6 +102,44 @@ def test_move_to_top(service):
     pytest.assume(service.get_queue()[0].track_name == "S3")
 
 
+def test_move_up(service):
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item("S1", uri="spotify:track:s1", requester="A"))
+    service.add_to_queue(_make_item("S2", uri="spotify:track:s2", requester="B"))
+    service.add_to_queue(_make_item("S3", uri="spotify:track:s3", requester="C"))
+    service.move_up("spotify:track:s3")
+    pytest.assume(service.get_queue()[1].track_name == "S3")
+    pytest.assume(service.get_queue()[2].track_name == "S2")
+
+
+def test_move_down(service):
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item("S1", uri="spotify:track:s1", requester="A"))
+    service.add_to_queue(_make_item("S2", uri="spotify:track:s2", requester="B"))
+    service.add_to_queue(_make_item("S3", uri="spotify:track:s3", requester="C"))
+    service.move_down("spotify:track:s1")
+    pytest.assume(service.get_queue()[0].track_name == "S2")
+    pytest.assume(service.get_queue()[1].track_name == "S1")
+
+
+def test_move_up_bumps_version(service):
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item("S1", uri="spotify:track:s1"))
+    service.add_to_queue(_make_item("S2", uri="spotify:track:s2"))
+    v = service.version
+    service.move_up("spotify:track:s2")
+    pytest.assume(service.version == v + 1)
+
+
+def test_move_down_bumps_version(service):
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item("S1", uri="spotify:track:s1"))
+    service.add_to_queue(_make_item("S2", uri="spotify:track:s2"))
+    v = service.version
+    service.move_down("spotify:track:s1")
+    pytest.assume(service.version == v + 1)
+
+
 def test_play_next(service, mock_spotify):
     service.start_session("Party", "dev1")
     service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))

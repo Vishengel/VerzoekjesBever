@@ -58,6 +58,24 @@ class QueueStore:
         self.queue = [item] + [q for q in self.queue if q.track_uri != track_uri]
         self._save()
 
+    def move_up(self, track_uri: str) -> None:
+        idx = next(
+            (i for i, q in enumerate(self.queue) if q.track_uri == track_uri), None
+        )
+        if idx is None or idx == 0:
+            return
+        self.queue[idx], self.queue[idx - 1] = self.queue[idx - 1], self.queue[idx]
+        self._save()
+
+    def move_down(self, track_uri: str) -> None:
+        idx = next(
+            (i for i, q in enumerate(self.queue) if q.track_uri == track_uri), None
+        )
+        if idx is None or idx == len(self.queue) - 1:
+            return
+        self.queue[idx], self.queue[idx + 1] = self.queue[idx + 1], self.queue[idx]
+        self._save()
+
     def set_currently_playing(self, item: QueueItem, state: PlaybackState) -> None:
         self.currently_playing = item
         self.playback_state = state

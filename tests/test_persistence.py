@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 
 from models import QueueItem, PlaybackState
@@ -8,7 +7,11 @@ import pytest
 
 def _make_item(name: str = "Song", requester: str = "Lisa") -> QueueItem:
     return QueueItem(
-        track_name=name, artist="Artist", album_art_url="", requester=requester, track_uri=f"spotify:track:{name}"
+        track_name=name,
+        artist="Artist",
+        album_art_url="",
+        requester=requester,
+        track_uri=f"spotify:track:{name}",
     )
 
 
@@ -108,6 +111,66 @@ def test_move_to_top(tmp_path: Path):
     pytest.assume(store.queue[0].track_name == "Song3")
 
 
+def test_move_up(tmp_path: Path):
+    store = QueueStore(tmp_path / "session.json")
+    store.start_session("Party", "dev1")
+    store.add_to_queue(_make_item("Song1"))
+    store.add_to_queue(_make_item("Song2"))
+    store.add_to_queue(_make_item("Song3"))
+    store.move_up("spotify:track:Song2")
+    pytest.assume(store.queue[0].track_name == "Song2")
+    pytest.assume(store.queue[1].track_name == "Song1")
+    pytest.assume(store.queue[2].track_name == "Song3")
+
+
+def test_move_up_first_item_noop(tmp_path: Path):
+    store = QueueStore(tmp_path / "session.json")
+    store.start_session("Party", "dev1")
+    store.add_to_queue(_make_item("Song1"))
+    store.add_to_queue(_make_item("Song2"))
+    store.move_up("spotify:track:Song1")
+    pytest.assume(store.queue[0].track_name == "Song1")
+    pytest.assume(store.queue[1].track_name == "Song2")
+
+
+def test_move_up_unknown_uri_noop(tmp_path: Path):
+    store = QueueStore(tmp_path / "session.json")
+    store.start_session("Party", "dev1")
+    store.add_to_queue(_make_item("Song1"))
+    store.move_up("spotify:track:nonexistent")
+    pytest.assume(len(store.queue) == 1)
+
+
+def test_move_down(tmp_path: Path):
+    store = QueueStore(tmp_path / "session.json")
+    store.start_session("Party", "dev1")
+    store.add_to_queue(_make_item("Song1"))
+    store.add_to_queue(_make_item("Song2"))
+    store.add_to_queue(_make_item("Song3"))
+    store.move_down("spotify:track:Song2")
+    pytest.assume(store.queue[0].track_name == "Song1")
+    pytest.assume(store.queue[1].track_name == "Song3")
+    pytest.assume(store.queue[2].track_name == "Song2")
+
+
+def test_move_down_last_item_noop(tmp_path: Path):
+    store = QueueStore(tmp_path / "session.json")
+    store.start_session("Party", "dev1")
+    store.add_to_queue(_make_item("Song1"))
+    store.add_to_queue(_make_item("Song2"))
+    store.move_down("spotify:track:Song2")
+    pytest.assume(store.queue[0].track_name == "Song1")
+    pytest.assume(store.queue[1].track_name == "Song2")
+
+
+def test_move_down_unknown_uri_noop(tmp_path: Path):
+    store = QueueStore(tmp_path / "session.json")
+    store.start_session("Party", "dev1")
+    store.add_to_queue(_make_item("Song1"))
+    store.move_down("spotify:track:nonexistent")
+    pytest.assume(len(store.queue) == 1)
+
+
 def test_persistence_survives_reload(tmp_path: Path):
     path = tmp_path / "session.json"
     store1 = QueueStore(path)
@@ -178,7 +241,9 @@ def test_get_known_requesters(tmp_path: Path):
 def test_get_known_requesters_includes_currently_playing(tmp_path: Path):
     store = QueueStore(tmp_path / "session.json")
     store.start_session("Party", "dev1")
-    store.set_currently_playing(_make_item("Now", requester="Charlie"), PlaybackState.PLAYING)
+    store.set_currently_playing(
+        _make_item("Now", requester="Charlie"), PlaybackState.PLAYING
+    )
     store.add_to_queue(_make_item("Next", requester="Dana"))
     requesters = store.get_known_requesters()
     pytest.assume("Charlie" in requesters)

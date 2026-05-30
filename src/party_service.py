@@ -101,6 +101,14 @@ class PartyService:
         self._store.move_to_top(track_uri)
         self._bump_version()
 
+    def move_up(self, track_uri: str) -> None:
+        self._store.move_up(track_uri)
+        self._bump_version()
+
+    def move_down(self, track_uri: str) -> None:
+        self._store.move_down(track_uri)
+        self._bump_version()
+
     def get_queue(self) -> list[QueueItem]:
         return list(self._store.queue)
 
