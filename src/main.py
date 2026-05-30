@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from pathlib import Path
 
 from nicegui import app, background_tasks, ui
@@ -31,8 +32,9 @@ def main():
     svc = get_service()
     svc.spotify.current_user()
 
+    reload = os.getenv("NICEGUI_RELOAD", "").lower() == "true"
     background_tasks.create_or_defer(poll_loop(), name="spotify-poll")
-    ui.run(title="VerzoekjesBever", favicon="🦫", dark=True, reload=False, show=False, port=8000)
+    ui.run(title="VerzoekjesBever", favicon="🦫", dark=True, reload=reload, show=False, port=8000)
 
 
 if __name__ == "__main__":
