@@ -28,6 +28,7 @@ class PlaybackInfo:
     is_playing: bool
     progress_ms: int
     duration_ms: int
+    track_uri: str | None = None
 
 
 @dataclass

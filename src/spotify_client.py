@@ -64,4 +64,5 @@ class SpotifyClient:
             is_playing=state.get("is_playing", False),
             progress_ms=state.get("progress_ms", 0),
             duration_ms=item.get("duration_ms", 0) if item else 0,
+            track_uri=item.get("uri") if item else None,
         )

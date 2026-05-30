@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from spotipy.exceptions import SpotifyException
 
-from models import PartyEvent, PartyEventType, PlaybackState, QueueItem
+from models import PartyEvent, PartyEventType, PlaybackInfo, PlaybackState, QueueItem
 from persistence import QueueStore
 
 if TYPE_CHECKING:
@@ -192,6 +192,12 @@ class PartyService:
     def get_devices(self) -> list[dict]:
         return self._spotify.get_devices()
 
+    def _is_our_track(self, info: PlaybackInfo) -> bool:
+        current = self._store.currently_playing
+        if current is None or info.track_uri is None:
+            return False
+        return info.track_uri == current.track_uri
+
     def poll_playback(self) -> None:
         if self._store.playback_state == PlaybackState.IDLE:
             return
@@ -201,6 +207,11 @@ class PartyService:
             if self._store.currently_playing is not None:
                 logger.info("Playback stopped externally, advancing queue")
                 self._advance_queue()
+            return
+
+        if not self._is_our_track(info):
+            logger.info("Our track no longer on Spotify, advancing queue")
+            self._advance_queue()
             return
 
         track_ended = (
