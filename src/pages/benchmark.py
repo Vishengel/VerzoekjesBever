@@ -1,7 +1,8 @@
 import time
 
-from nicegui import ui
+from nicegui import app, ui
 
+from config import CONFIG
 from deps import get_service
 from load_test_utils import make_fake_items
 
@@ -10,6 +11,9 @@ SIZES = [10, 50, 100, 500]
 
 @ui.page("/benchmark", title="VerzoekjesBever - Benchmark", dark=True)
 def benchmark_page():
+    if CONFIG.dj_password and not app.storage.user.get("authenticated"):
+        ui.navigate.to("/login")
+        return
     svc = get_service()
 
     with ui.column().classes("w-full max-w-lg mx-auto mt-16 gap-6"):
