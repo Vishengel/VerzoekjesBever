@@ -1,0 +1,11 @@
+services:
+  verzoekjesbever:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./session.json:/app/session.json
+      - ./cache:/app/cache
+    restart: unless-stopped
