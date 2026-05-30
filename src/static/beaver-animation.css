@@ -87,3 +87,104 @@
 .beaver-bat .now-playing-card {
     animation: bat-card-shatter 2s ease-in-out forwards;
 }
+
+/* ── Queue-add animation ─────────────────────────── */
+
+.beaver-incoming {
+    opacity: 0;
+}
+
+.queue-add-target {
+    position: relative;
+    overflow: visible;
+}
+
+.beaver-add-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+    overflow: visible;
+}
+
+/* Carry — beaver slides from left, pushes card into view */
+@keyframes carry-beaver-slide {
+    0% { transform: translateX(-150%) rotate(-10deg); }
+    30% { transform: translateX(-10%) rotate(5deg); }
+    50% { transform: translateX(20%) rotate(-3deg); }
+    70% { transform: translateX(60%) rotate(5deg); }
+    100% { transform: translateX(150%) rotate(10deg); }
+}
+
+@keyframes carry-card-reveal {
+    0% { opacity: 0; transform: translateX(-30px); }
+    30% { opacity: 0; transform: translateX(-30px); }
+    50% { opacity: 0.7; transform: translateX(5px); }
+    70% { opacity: 1; transform: translateX(-3px); }
+    100% { opacity: 1; transform: translateX(0); }
+}
+
+.beaver-add-carry .beaver-actor {
+    top: 50%;
+    left: 0;
+    margin-top: -40px;
+}
+
+/* Toss — beaver pops up from below, flings card upward */
+@keyframes toss-beaver-popup {
+    0% { transform: translateY(200%); }
+    25% { transform: translateY(-10%); }
+    45% { transform: translateY(0%) scaleY(0.9); }
+    60% { transform: translateY(-5%); }
+    100% { transform: translateY(200%); }
+}
+
+@keyframes toss-card-reveal {
+    0% { opacity: 0; transform: translateY(40px) rotate(5deg); }
+    40% { opacity: 0; transform: translateY(40px) rotate(5deg); }
+    60% { opacity: 0.7; transform: translateY(-5px) rotate(-2deg); }
+    80% { opacity: 1; transform: translateY(3px) rotate(0deg); }
+    100% { opacity: 1; transform: translateY(0) rotate(0deg); }
+}
+
+.beaver-add-toss .beaver-actor {
+    bottom: 0;
+    left: 50%;
+    margin-left: -40px;
+}
+
+/* Build — beaver hammers card into existence */
+@keyframes build-beaver-hammer {
+    0% { transform: translateY(-100%) rotate(0deg); opacity: 0; }
+    15% { transform: translateY(0%) rotate(0deg); opacity: 1; }
+    25% { transform: translateY(-20%) rotate(-15deg); }
+    35% { transform: translateY(0%) rotate(5deg); }
+    45% { transform: translateY(-15%) rotate(-10deg); }
+    55% { transform: translateY(0%) rotate(3deg); }
+    65% { transform: translateY(-10%) rotate(-5deg); }
+    75% { transform: translateY(0%) rotate(0deg); }
+    100% { transform: translateY(-100%) rotate(0deg); opacity: 0; }
+}
+
+@keyframes build-card-reveal {
+    0% { opacity: 0; transform: scaleY(0.3); transform-origin: bottom; }
+    35% { opacity: 0; transform: scaleY(0.3); transform-origin: bottom; }
+    50% { opacity: 0.5; transform: scaleY(0.7); transform-origin: bottom; }
+    70% { opacity: 0.8; transform: scaleY(0.95); transform-origin: bottom; }
+    85% { opacity: 1; transform: scaleY(1.03); transform-origin: bottom; }
+    100% { opacity: 1; transform: scaleY(1); transform-origin: bottom; }
+}
+
+.beaver-add-build .beaver-actor {
+    top: 50%;
+    left: 50%;
+    margin-top: -40px;
+    margin-left: -40px;
+}
+
+/* Priority glow — golden pulse after card reveal */
+@keyframes priority-glow {
+    0% { box-shadow: 0 0 0 rgba(255, 215, 0, 0); }
+    50% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.6), 0 0 40px rgba(255, 215, 0, 0.3); }
+    100% { box-shadow: 0 0 0 rgba(255, 215, 0, 0); }
+}
