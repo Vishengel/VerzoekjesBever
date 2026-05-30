@@ -151,9 +151,10 @@ class DJPage:
             devices = self.svc.get_devices()
             options = {d["id"]: f"{d['name']} ({d['type']})" for d in devices}
             with ui.row().classes("w-full items-center gap-2"):
+                current_device = self.svc.device_id if self.svc.device_id in options else None
                 ui.select(
                     options=options,
-                    value=self.svc.device_id,
+                    value=current_device,
                     label="Playback device",
                     on_change=lambda e: self.svc.set_device(e.value),
                 ).classes("flex-grow")
