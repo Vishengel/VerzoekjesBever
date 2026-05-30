@@ -1,0 +1,6 @@
+services:
+  verzoekjesbever:
+    volumes:
+      - ./src:/app/src
+    environment:
+      - NICEGUI_RELOAD=true
