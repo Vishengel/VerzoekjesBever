@@ -128,3 +128,17 @@ def test_pop_next(tmp_path: Path, size: int):
     )
     pytest.assume(item is not None)
     pytest.assume(len(store.queue) == size - 1)
+
+
+@pytest.mark.load
+@pytest.mark.parametrize("size", SIZES)
+def test_save_reload_cycle(tmp_path: Path, size: int):
+    _filled_store(tmp_path, size)
+    path = tmp_path / "session.json"
+
+    elapsed, _ = _time_ms(lambda: QueueStore(path))
+
+    print(f"save_reload @{size}: {elapsed:.1f}ms")
+    pytest.assume(
+        elapsed < THRESHOLD_MS, f"Reload of {size}-item queue took {elapsed:.1f}ms"
+    )
