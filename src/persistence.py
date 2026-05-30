@@ -47,6 +47,10 @@ class QueueStore:
         self._save()
         return item
 
+    def clear_queue(self) -> None:
+        self.queue = []
+        self._save()
+
     def move_to_top(self, track_uri: str) -> None:
         item = next((q for q in self.queue if q.track_uri == track_uri), None)
         if item is None:
@@ -113,7 +117,9 @@ class QueueStore:
             "session_name": self.session_name,
             "device_id": self.device_id,
             "playback_state": self.playback_state.value,
-            "currently_playing": self.currently_playing.to_dict() if self.currently_playing else None,
+            "currently_playing": self.currently_playing.to_dict()
+            if self.currently_playing
+            else None,
             "queue": [q.to_dict() for q in self.queue],
         }
         tmp = self._path.with_suffix(".tmp")

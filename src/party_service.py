@@ -91,6 +91,10 @@ class PartyService:
         self._store.remove_from_queue(track_uri)
         self._bump_version()
 
+    def clear_queue(self) -> None:
+        self._store.clear_queue()
+        self._bump_version()
+
     def move_to_top(self, track_uri: str) -> None:
         self._store.move_to_top(track_uri)
         self._bump_version()
@@ -150,12 +154,18 @@ class PartyService:
         progress = state.get("progress_ms", 0)
         duration = item.get("duration_ms", 0) if item else 0
 
-        track_ended = not is_playing and duration > 0 and (duration - progress) < TRACK_END_THRESHOLD_MS
+        track_ended = (
+            not is_playing
+            and duration > 0
+            and (duration - progress) < TRACK_END_THRESHOLD_MS
+        )
 
         if track_ended:
             next_item = self._store.pop_next()
             if next_item:
-                self._spotify.play_track(next_item.track_uri, device_id=self._store.device_id)
+                self._spotify.play_track(
+                    next_item.track_uri, device_id=self._store.device_id
+                )
                 self._store.set_currently_playing(next_item, PlaybackState.PLAYING)
             else:
                 self._store.clear_currently_playing()
