@@ -1,0 +1,27 @@
+repos:
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    # uv version.
+    rev: 0.7.19
+    hooks:
+      # Update the uv lockfile
+      - id: uv-lock
+        name: uv-lock
+      - id: uv-export
+        name: uv-export
+        args: [ "-o", "src/services/playlist_manager/requirements.txt", "--no-dev" ]
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.12.11
+    hooks:
+      # Run the linter.
+      - id: ruff-check
+        args: [ --fix ]
+      # Run the formatter.
+      - id: ruff-format
+  - repo: https://github.com/facebook/pyrefly-pre-commit
+    rev: 0.0.1
+    hooks:
+      - id: pyrefly-typecheck-specific-version
+        name: Pyrefly (type checking)
+        pass_filenames: false
+        additional_dependencies: ["pyrefly==0.42.2"]
