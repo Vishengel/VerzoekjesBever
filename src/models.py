@@ -23,6 +23,13 @@ class PartyEvent:
     is_priority: bool = False
 
 
+@dataclass(frozen=True)
+class PlaybackInfo:
+    is_playing: bool
+    progress_ms: int
+    duration_ms: int
+
+
 @dataclass
 class QueueItem:
     track_name: str

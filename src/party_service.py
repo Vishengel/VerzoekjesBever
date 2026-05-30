@@ -37,10 +37,6 @@ class PartyService:
         self._show_qr_code: bool = False
 
     @property
-    def spotify(self) -> SpotifyClient:
-        return self._spotify
-
-    @property
     def version(self) -> int:
         return self._version
 
@@ -89,6 +85,9 @@ class PartyService:
     def demo_queue_active(self) -> bool:
         return self._store.demo_queue_active
 
+    def ensure_authenticated(self) -> None:
+        self._spotify.ensure_authenticated()
+
     def set_beaver_enabled(self, enabled: bool) -> None:
         self._beaver_enabled = enabled
 
@@ -115,8 +114,7 @@ class PartyService:
         self._bump_version()
 
     def search_songs(self, query: str) -> list[QueueItem]:
-        tracks = self._spotify.search_tracks(query)
-        return [QueueItem.from_spotify_track(t, requester="") for t in tracks]
+        return self._spotify.search_tracks(query)
 
     def add_to_queue(self, item: QueueItem, top: bool = False) -> None:
         if self._store.demo_queue_active:
@@ -192,33 +190,30 @@ class PartyService:
         if self._store.playback_state == PlaybackState.IDLE:
             return
 
-        state = self._spotify.get_playback_state()
-        if state is None:
+        info = self._spotify.get_playback_state()
+        if info is None:
             if self._store.currently_playing is not None:
                 logger.info("Playback stopped externally, advancing queue")
                 self._advance_queue()
             return
 
-        is_playing = state.get("is_playing", False)
-        item = state.get("item")
-        progress = state.get("progress_ms", 0)
-        duration = item.get("duration_ms", 0) if item else 0
-
         track_ended = (
-            not is_playing
-            and duration > 0
-            and (duration - progress) < TRACK_END_THRESHOLD_MS
+            not info.is_playing
+            and info.duration_ms > 0
+            and (info.duration_ms - info.progress_ms) < TRACK_END_THRESHOLD_MS
         )
 
         if track_ended:
             self._advance_queue()
             return
 
-        if is_playing and self._store.playback_state == PlaybackState.PAUSED:
+        if info.is_playing and self._store.playback_state == PlaybackState.PAUSED:
             logger.info("Playback resumed externally")
             self._store.set_playback_state(PlaybackState.PLAYING)
             self._bump_version()
-        elif not is_playing and self._store.playback_state == PlaybackState.PLAYING:
+        elif (
+            not info.is_playing and self._store.playback_state == PlaybackState.PLAYING
+        ):
             logger.info("Playback paused externally")
             self._store.set_playback_state(PlaybackState.PAUSED)
             self._bump_version()

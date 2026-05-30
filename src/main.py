@@ -30,7 +30,7 @@ async def poll_loop() -> None:
 
 def main():
     svc = get_service()
-    svc.spotify.current_user()
+    svc.ensure_authenticated()
 
     reload = os.getenv("NICEGUI_RELOAD", "").lower() == "true"
     background_tasks.create_or_defer(poll_loop(), name="spotify-poll")
