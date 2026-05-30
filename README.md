@@ -69,15 +69,32 @@ A multi-platform image is published to GHCR on every push to `master`.
 
 ### Quick start (no clone needed)
 
+Create a project folder with the required config and directories:
+
+```sh
+mkdir verzoekjesbever
+cd verzoekjesbever
+mkdir data cache
+```
+
+Create a file called `.env` with your Spotify credentials:
+
+```
+SPOTIPY_CLIENT_ID=your-client-id
+SPOTIPY_CLIENT_SECRET=your-client-secret
+DJ_PASSWORD=your-dj-password
+```
+
+Run the container:
+
 ```sh
 docker run -d \
   -p 8000:8000 \
-  -e SPOTIPY_CLIENT_ID=your-client-id \
-  -e SPOTIPY_CLIENT_SECRET=your-client-secret \
-  -e DJ_PASSWORD=your-dj-password \
+  --env-file .env \
   -v ./data:/app/data \
   -v ./cache:/app/cache \
   --restart unless-stopped \
+  --name verzoekjesbever \
   ghcr.io/vishengel/verzoekjesbever:latest
 ```
 
