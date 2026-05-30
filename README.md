@@ -126,3 +126,7 @@ Session state persists in `./data/`, Spotify auth cache in `./cache/`.
 uv sync --group dev
 uv run pytest
 ```
+
+## Benchmarking
+
+Navigate to `/benchmark` to load-test the queue with fake tracks. Pick a queue size (10 to 500 items), fill the queue, then open the DJ or audience page to check rendering performance. Requires an active session and DJ authentication.
