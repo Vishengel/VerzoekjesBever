@@ -6,6 +6,6 @@ services:
     env_file:
       - .env
     volumes:
-      - ./session.json:/app/session.json
+      - ./data:/app/data
       - ./cache:/app/cache
     restart: unless-stopped

@@ -13,12 +13,13 @@ class Config(BaseSettings):
     spotipy_client_secret: SecretStr
     spotipy_redirect_uri: str
 
-    queue_store_path: Path = project_root / "session.json"
+    queue_store_path: Path = project_root / "data" / "session.json"
 
     model_config = SettingsConfigDict(
         env_file=project_root / ".env",
         env_file_encoding="utf-8",
         env_ignore_empty=True,
     )
+
 
 CONFIG = Config()

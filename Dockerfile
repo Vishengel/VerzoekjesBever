@@ -19,7 +19,7 @@ RUN useradd --create-home appuser
 
 COPY --from=builder /app /app
 
-RUN mkdir -p /app/cache && touch /app/session.json && chown -R appuser:appuser /app
+RUN mkdir -p /app/cache /app/data && chown -R appuser:appuser /app
 
 USER appuser
 
