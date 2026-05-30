@@ -85,8 +85,14 @@ class PartyService:
     def demo_queue_active(self) -> bool:
         return self._store.demo_queue_active
 
-    def ensure_authenticated(self) -> None:
-        self._spotify.ensure_authenticated()
+    def is_authenticated(self) -> bool:
+        return self._spotify.is_authenticated()
+
+    def get_auth_url(self) -> str:
+        return self._spotify.get_auth_url()
+
+    def handle_auth_callback(self, code: str) -> None:
+        self._spotify.handle_auth_callback(code)
 
     def set_beaver_enabled(self, enabled: bool) -> None:
         self._beaver_enabled = enabled

@@ -539,3 +539,24 @@ def test_start_session_without_demo(service):
     service.start_session("Party", "dev1", demo=False)
     pytest.assume(len(service.get_queue()) == 0)
     pytest.assume(service.demo_queue_active is False)
+
+
+def test_is_authenticated(service, mock_spotify):
+    mock_spotify.is_authenticated.return_value = True
+    pytest.assume(service.is_authenticated() is True)
+    mock_spotify.is_authenticated.return_value = False
+    pytest.assume(service.is_authenticated() is False)
+
+
+def test_get_auth_url(service, mock_spotify):
+    mock_spotify.get_auth_url.return_value = (
+        "https://accounts.spotify.com/authorize?..."
+    )
+    pytest.assume(
+        service.get_auth_url() == "https://accounts.spotify.com/authorize?..."
+    )
+
+
+def test_handle_auth_callback(service, mock_spotify):
+    service.handle_auth_callback("test-code")
+    mock_spotify.handle_auth_callback.assert_called_once_with("test-code")
