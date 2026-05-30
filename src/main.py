@@ -9,7 +9,7 @@ from spotipy.exceptions import SpotifyException
 
 from config import CONFIG
 from deps import get_service
-from pages import audience, dj, login, startup  # noqa: F401
+from pages import audience, benchmark, dj, login, startup  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
