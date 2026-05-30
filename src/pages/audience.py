@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 
 from nicegui import ui
 
@@ -20,13 +21,17 @@ def audience_page():
     with ui.column().classes("w-full max-w-3xl mx-auto p-8 gap-6"):
         with ui.column().classes("items-center gap-1"):
             ui.label("🦫").classes("text-5xl")
-            ui.label("VERZOEKJESBEVER").classes("text-2xl font-extrabold tracking-wide text-white")
+            ui.label("VERZOEKJESBEVER").classes(
+                "text-2xl font-extrabold tracking-wide text-white"
+            )
             ui.label("REQUEST PARTY").classes("text-xs tracking-[0.3em] text-green-400")
 
         if not svc.has_session:
             with ui.card().classes("w-full bg-gray-800 rounded-xl p-8 text-center"):
                 ui.label("🦫").classes("text-4xl")
-                ui.label("Waiting for DJ to start the party").classes("text-xl text-gray-400 mt-2")
+                ui.label("Waiting for DJ to start the party").classes(
+                    "text-xl text-gray-400 mt-2"
+                )
                 ui.label("Check back soon!").classes("text-gray-500")
             return
 
@@ -36,44 +41,84 @@ def audience_page():
 
             if current:
                 with ui.element("div").classes("now-playing-wrapper w-full"):
-                    with ui.card().classes("w-full bg-green-600 rounded-xl p-5 now-playing-card"):
-                        ui.label("NOW PLAYING").classes("text-xs tracking-[0.2em] text-white/70")
+                    with ui.card().classes(
+                        "w-full bg-green-600 rounded-xl p-5 now-playing-card"
+                    ):
+                        ui.label("NOW PLAYING").classes(
+                            "text-xs tracking-[0.2em] text-white/70"
+                        )
                         with ui.row().classes("items-center gap-5 mt-2"):
                             if current.album_art_url:
-                                ui.image(current.album_art_url).classes("w-20 h-20 rounded-lg")
+                                ui.image(current.album_art_url).classes(
+                                    "w-20 h-20 rounded-lg"
+                                )
                             with ui.column().classes("gap-0"):
-                                ui.label(current.track_name).classes("text-2xl font-extrabold text-white")
-                                ui.label(current.artist).classes("text-lg text-white/85")
+                                ui.label(current.track_name).classes(
+                                    "text-2xl font-extrabold text-white"
+                                )
+                                ui.label(current.artist).classes(
+                                    "text-lg text-white/85"
+                                )
                                 if current.requester:
-                                    ui.label(f"🎤 Requested by {current.requester}").classes(
-                                        "text-sm text-white/60 mt-1"
-                                    )
+                                    ui.label(
+                                        f"🎤 Requested by {current.requester}"
+                                    ).classes("text-sm text-white/60 mt-1")
             else:
                 with ui.card().classes("w-full bg-gray-800 rounded-xl p-8 text-center"):
                     ui.label("🦫").classes("text-4xl")
-                    ui.label("No song playing yet").classes("text-xl text-gray-400 mt-2")
+                    ui.label("No song playing yet").classes(
+                        "text-xl text-gray-400 mt-2"
+                    )
                     ui.label("Make a request!").classes("text-gray-500")
 
             queue = svc.get_queue()
             if queue:
-                ui.label("UP NEXT").classes("text-xs tracking-[0.2em] text-gray-500 mt-4")
+                ui.label("UP NEXT").classes(
+                    "text-xs tracking-[0.2em] text-gray-500 mt-4"
+                )
                 with ui.card().classes("w-full bg-white/5 rounded-xl p-1"):
                     for i, item in enumerate(queue):
                         border = "border-b border-white/5" if i < len(queue) - 1 else ""
-                        with ui.row().classes(f"items-center gap-3 px-4 py-3 {border}"):
-                            ui.label(str(i + 1)).classes("text-green-400 font-extrabold text-lg w-7 text-center")
-                            if item.album_art_url:
-                                ui.image(item.album_art_url).classes("w-11 h-11 rounded-md")
-                            with ui.column().classes("flex-grow gap-0"):
-                                ui.label(item.track_name).classes("text-white font-semibold text-base")
-                                ui.label(item.artist).classes("text-gray-400 text-sm")
-                                if item.requester:
-                                    ui.label(f"🎤 {item.requester}").classes("text-orange-400 text-xs mt-0.5")
+                        is_target = (
+                            pending_add["uri"] and item.track_uri == pending_add["uri"]
+                        )
+
+                        container = (
+                            ui.element("div").classes("queue-add-target")
+                            if is_target
+                            else contextlib.nullcontext()
+                        )
+
+                        with container:
+                            row_classes = f"items-center gap-3 px-4 py-3 {border}"
+                            if is_target:
+                                row_classes += " beaver-incoming"
+                            with ui.row().classes(row_classes):
+                                ui.label(str(i + 1)).classes(
+                                    "text-green-400 font-extrabold text-lg w-7 text-center"
+                                )
+                                if item.album_art_url:
+                                    ui.image(item.album_art_url).classes(
+                                        "w-11 h-11 rounded-md"
+                                    )
+                                with ui.column().classes("flex-grow gap-0"):
+                                    ui.label(item.track_name).classes(
+                                        "text-white font-semibold text-base"
+                                    )
+                                    ui.label(item.artist).classes(
+                                        "text-gray-400 text-sm"
+                                    )
+                                    if item.requester:
+                                        ui.label(f"🎤 {item.requester}").classes(
+                                            "text-orange-400 text-xs mt-0.5"
+                                        )
 
         playlist_display()
 
         local_version = {"v": svc.version}
         local_skip_version = {"v": svc.last_skip_version}
+        local_add_version = {"v": svc.last_add_version}
+        pending_add = {"uri": None, "top": False}
 
         async def check_updates():
             if svc.version != local_version["v"]:
@@ -81,13 +126,30 @@ def audience_page():
                     svc.beaver_enabled
                     and svc.last_skip_version > local_skip_version["v"]
                 )
+                add_happened = (
+                    svc.beaver_enabled and svc.last_add_version > local_add_version["v"]
+                )
+
                 local_version["v"] = svc.version
                 local_skip_version["v"] = svc.last_skip_version
+                local_add_version["v"] = svc.last_add_version
 
                 if skip_happened:
                     await ui.run_javascript("triggerBeaverAnimation()")
                     await asyncio.sleep(2.2)
 
+                if add_happened:
+                    pending_add["uri"] = svc.last_added_uri
+                    pending_add["top"] = svc.last_add_was_top
+
                 playlist_display.refresh()
+
+                if add_happened:
+                    is_priority = pending_add["top"]
+                    await ui.run_javascript(
+                        f"triggerBeaverAddAnimation({str(is_priority).lower()})"
+                    )
+                    await asyncio.sleep(3.5 if is_priority else 2.4)
+                    pending_add["uri"] = None
 
         ui.timer(1.0, check_updates)
