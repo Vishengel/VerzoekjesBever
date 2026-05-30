@@ -1,0 +1,8 @@
+cache/
+session.json
+.env
+__pycache__
+.git
+tests/
+docs/
+*.pyc
