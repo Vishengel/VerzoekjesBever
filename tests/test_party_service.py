@@ -277,8 +277,8 @@ def test_poll_track_end_does_not_bump_skip_version(service, mock_spotify):
     pytest.assume(service.last_skip_version == skip_v)
 
 
-def test_beaver_enabled_default_true(service):
-    pytest.assume(service.beaver_enabled is True)
+def test_beaver_enabled_default_false(service):
+    pytest.assume(service.beaver_enabled is False)
 
 
 def test_set_beaver_enabled(service):

@@ -29,6 +29,7 @@ class DJPage:
         self._search_timer: ui.timer | None = None
         self._queue_display = None
         self._playback_controls = None
+        self._queue_filter: str = ""
 
     def build(self):
         with ui.row().classes("w-full h-screen gap-0"):
@@ -245,10 +246,23 @@ class DJPage:
                 ui.button("Clear queue", on_click=self._confirm_clear_queue).props(
                     "flat dense color=negative size=sm"
                 )
+
+        if queue:
+            ui.input(
+                placeholder="Filter by requester, title, or artist...",
+                value=self._queue_filter,
+                on_change=self._on_queue_filter,
+            ).classes("w-full").props("dense clearable outlined")
+
         if not queue:
             ui.label("No songs in queue yet").classes("text-gray-500 italic")
-        for i, item in enumerate(queue):
-            self._render_queue_item(i, item, len(queue))
+            return
+
+        filtered = self._apply_queue_filter(queue)
+        if self._queue_filter and not filtered:
+            ui.label("No matching songs").classes("text-gray-500 italic")
+        for i, item in enumerate(filtered):
+            self._render_queue_item(i, item, len(filtered))
 
     def _render_now_playing(self, current: QueueItem):
         with ui.card().classes("w-full bg-gray-900 border-2 border-green-500"):
@@ -324,6 +338,22 @@ class DJPage:
                         self._queue_display.refresh(),
                     ),
                 ).props("flat round dense color=negative")
+
+    def _on_queue_filter(self, e):
+        self._queue_filter = e.value or ""
+        self._queue_display.refresh()
+
+    def _apply_queue_filter(self, queue: list[QueueItem]) -> list[QueueItem]:
+        if not self._queue_filter:
+            return queue
+        term = self._queue_filter.lower()
+        return [
+            item
+            for item in queue
+            if term in item.track_name.lower()
+            or term in item.artist.lower()
+            or term in item.requester.lower()
+        ]
 
     def _build_update_timer(self):
         local_version = {"v": self.svc.version}
