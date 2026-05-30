@@ -20,6 +20,9 @@ class PartyService:
         self._store = store
         self._version: int = 0
         self._last_skip_version: int = 0
+        self._last_add_version: int = 0
+        self._last_added_uri: str | None = None
+        self._last_add_was_top: bool = False
         self._beaver_enabled: bool = True
 
     @property
@@ -51,6 +54,18 @@ class PartyService:
         return self._last_skip_version
 
     @property
+    def last_add_version(self) -> int:
+        return self._last_add_version
+
+    @property
+    def last_added_uri(self) -> str | None:
+        return self._last_added_uri
+
+    @property
+    def last_add_was_top(self) -> bool:
+        return self._last_add_was_top
+
+    @property
     def beaver_enabled(self) -> bool:
         return self._beaver_enabled
 
@@ -67,6 +82,9 @@ class PartyService:
 
     def add_to_queue(self, item: QueueItem, top: bool = False) -> None:
         self._store.add_to_queue(item, top=top)
+        self._last_added_uri = item.track_uri
+        self._last_add_was_top = top
+        self._last_add_version += 1
         self._bump_version()
 
     def remove_from_queue(self, track_uri: str) -> None:

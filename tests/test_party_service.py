@@ -261,6 +261,41 @@ def test_get_known_requesters_includes_currently_playing(service, mock_spotify):
     pytest.assume("Dana" in service.get_known_requesters())
 
 
+def test_add_to_queue_bumps_add_version(service):
+    service.start_session("Party", "dev1")
+    pytest.assume(service.last_add_version == 0)
+    service.add_to_queue(_make_item(requester="Lisa"))
+    pytest.assume(service.last_add_version == 1)
+    service.add_to_queue(_make_item("S2", uri="spotify:track:s2", requester="Mark"))
+    pytest.assume(service.last_add_version == 2)
+
+
+def test_add_to_queue_tracks_last_added_uri(service):
+    service.start_session("Party", "dev1")
+    pytest.assume(service.last_added_uri is None)
+    service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
+    pytest.assume(service.last_added_uri == "spotify:track:s1")
+    service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="Mark"))
+    pytest.assume(service.last_added_uri == "spotify:track:s2")
+
+
+def test_add_to_queue_tracks_top_flag(service):
+    service.start_session("Party", "dev1")
+    pytest.assume(service.last_add_was_top is False)
+    service.add_to_queue(_make_item(requester="Lisa"), top=True)
+    pytest.assume(service.last_add_was_top is True)
+    service.add_to_queue(_make_item("S2", uri="spotify:track:s2", requester="Mark"), top=False)
+    pytest.assume(service.last_add_was_top is False)
+
+
+def test_play_next_does_not_bump_add_version(service, mock_spotify):
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item(requester="Lisa"))
+    add_v = service.last_add_version
+    service.play_next()
+    pytest.assume(service.last_add_version == add_v)
+
+
 def test_session_persists_across_restart(service, mock_spotify, tmp_path):
     service.start_session("Party", "dev1")
     service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
