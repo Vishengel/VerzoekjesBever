@@ -173,14 +173,20 @@ class DJPage:
             def playback_controls():
                 self._render_playback_controls()
 
+            self._playback_controls = playback_controls
+            playback_controls()
+
+            ui.input(
+                placeholder="Filter by requester, title, or artist...",
+                value=self._queue_filter,
+                on_change=self._on_queue_filter,
+            ).classes("w-full").props("dense clearable outlined")
+
             @ui.refreshable
             def queue_display():
                 self._render_queue()
 
-            self._playback_controls = playback_controls
             self._queue_display = queue_display
-
-            playback_controls()
             queue_display()
 
             self._build_update_timer()
@@ -246,13 +252,6 @@ class DJPage:
                 ui.button("Clear queue", on_click=self._confirm_clear_queue).props(
                     "flat dense color=negative size=sm"
                 )
-
-        if queue:
-            ui.input(
-                placeholder="Filter by requester, title, or artist...",
-                value=self._queue_filter,
-                on_change=self._on_queue_filter,
-            ).classes("w-full").props("dense clearable outlined")
 
         if not queue:
             ui.label("No songs in queue yet").classes("text-gray-500 italic")
@@ -331,6 +330,15 @@ class DJPage:
                     ).props("flat round dense color=warning size=sm")
                     if index == queue_len - 1:
                         down_btn.props(add="disable")
+                top_btn = ui.button(
+                    icon="vertical_align_top",
+                    on_click=lambda uid=item.uid: (
+                        self.svc.move_to_top(uid),
+                        self._queue_display.refresh(),
+                    ),
+                ).props("flat round dense color=orange size=sm")
+                if index == 0:
+                    top_btn.props(add="disable")
                 ui.button(
                     icon="delete",
                     on_click=lambda uid=item.uid: (

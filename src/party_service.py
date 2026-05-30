@@ -34,6 +34,8 @@ class PartyService:
         self._last_add_version: int = 0
         self._last_added_uri: str | None = None
         self._last_add_was_top: bool = False
+        self._last_move_top_version: int = 0
+        self._last_move_top_uri: str | None = None
         self._beaver_enabled: bool = False
         self._show_qr_code: bool = False
 
@@ -76,6 +78,14 @@ class PartyService:
     @property
     def last_add_was_top(self) -> bool:
         return self._last_add_was_top
+
+    @property
+    def last_move_top_version(self) -> int:
+        return self._last_move_top_version
+
+    @property
+    def last_move_top_uri(self) -> str | None:
+        return self._last_move_top_uri
 
     @property
     def beaver_enabled(self) -> bool:
@@ -137,6 +147,10 @@ class PartyService:
         self._bump_version()
 
     def move_to_top(self, uid: str) -> None:
+        item = next((q for q in self._store.queue if q.uid == uid), None)
+        if item:
+            self._last_move_top_uri = item.track_uri
+            self._last_move_top_version += 1
         self._store.move_to_top(uid)
         self._bump_version()
 

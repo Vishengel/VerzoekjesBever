@@ -32,6 +32,15 @@ function triggerBeaverAnimation() {
     }, 2200);
 }
 
+function triggerPriorityGlow() {
+    var target = document.querySelector('.priority-glow-target');
+    if (!target) return;
+    target.style.animation = 'priority-glow 0.6s ease-in-out 3';
+    setTimeout(function() {
+        target.style.animation = '';
+    }, 2000);
+}
+
 function triggerBeaverAddAnimation(isPriority) {
     var wrapper = document.querySelector('.queue-add-target');
     if (!wrapper) return;

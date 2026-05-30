@@ -58,6 +58,7 @@ def audience_page():
             return
 
         pending_add = {"uri": None, "top": False}
+        pending_glow = {"uri": None}
 
         @ui.refreshable
         def playlist_display():
@@ -106,6 +107,11 @@ def audience_page():
                         is_target = (
                             pending_add["uri"] and item.track_uri == pending_add["uri"]
                         )
+                        is_glow = (
+                            not is_target
+                            and pending_glow["uri"]
+                            and item.track_uri == pending_glow["uri"]
+                        )
 
                         container = (
                             ui.element("div").classes("queue-add-target")
@@ -117,6 +123,8 @@ def audience_page():
                             row_classes = f"items-center gap-3 px-4 py-3 {border}"
                             if is_target:
                                 row_classes += " beaver-incoming"
+                            if is_glow:
+                                row_classes += " priority-glow-target"
                             with ui.row().classes(row_classes):
                                 ui.label(str(i + 1)).classes(
                                     "text-green-400 font-extrabold text-lg w-7 text-center"
@@ -165,6 +173,7 @@ def audience_page():
         local_version = {"v": svc.version}
         local_skip_version = {"v": svc.last_skip_version}
         local_add_version = {"v": svc.last_add_version}
+        local_move_top_version = {"v": svc.last_move_top_version}
 
         async def check_updates():
             if svc.version != local_version["v"]:
@@ -172,31 +181,44 @@ def audience_page():
                     svc.beaver_enabled
                     and svc.last_skip_version > local_skip_version["v"]
                 )
-                add_happened = (
-                    svc.beaver_enabled and svc.last_add_version > local_add_version["v"]
+                add_happened = svc.last_add_version > local_add_version["v"]
+                move_top_happened = (
+                    svc.last_move_top_version > local_move_top_version["v"]
                 )
+                beaver_add = add_happened and svc.beaver_enabled
 
                 local_version["v"] = svc.version
                 local_skip_version["v"] = svc.last_skip_version
                 local_add_version["v"] = svc.last_add_version
+                local_move_top_version["v"] = svc.last_move_top_version
 
                 if skip_happened:
                     await ui.run_javascript("triggerBeaverAnimation()")
                     await asyncio.sleep(2.2)
 
-                if add_happened:
+                if beaver_add:
                     pending_add["uri"] = svc.last_added_uri
                     pending_add["top"] = svc.last_add_was_top
+
+                if move_top_happened:
+                    pending_glow["uri"] = svc.last_move_top_uri
+                elif add_happened and svc.last_add_was_top and not beaver_add:
+                    pending_glow["uri"] = svc.last_added_uri
 
                 playlist_display.refresh()
                 qr_overlay.refresh()
 
-                if add_happened:
+                if beaver_add:
                     is_priority = pending_add["top"]
                     await ui.run_javascript(
                         f"triggerBeaverAddAnimation({str(is_priority).lower()})"
                     )
                     await asyncio.sleep(3.5 if is_priority else 2.4)
                     pending_add["uri"] = None
+
+                if pending_glow["uri"]:
+                    await ui.run_javascript("triggerPriorityGlow()")
+                    await asyncio.sleep(2.0)
+                    pending_glow["uri"] = None
 
         ui.timer(1.0, check_updates)
