@@ -98,7 +98,7 @@ def audience_page():
             queue = svc.get_queue()
             if queue:
                 ui.label("UP NEXT").classes(
-                    "text-xs tracking-[0.2em] text-gray-500 mt-4"
+                    "text-sm font-bold tracking-[0.2em] text-green-400/70 mt-4"
                 )
                 with ui.card().classes("w-full bg-white/5 rounded-xl p-1"):
                     for i, item in enumerate(queue):
