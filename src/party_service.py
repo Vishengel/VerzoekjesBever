@@ -107,6 +107,13 @@ class PartyService:
             self._store.add_to_queue(DEMO_SONG)
         self._store.set_demo_queue_active(True)
 
+    def fill_benchmark_queue(self, items: list[QueueItem]) -> None:
+        self._store.clear_queue()
+        for item in items:
+            self._store.add_to_queue(item)
+        self._store.set_demo_queue_active(True)
+        self._bump_version()
+
     def search_songs(self, query: str) -> list[QueueItem]:
         tracks = self._spotify.search_tracks(query)
         return [QueueItem.from_spotify_track(t, requester="") for t in tracks]
