@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 from spotipy.exceptions import SpotifyException
 
-from models import PlaybackState, QueueItem
+from models import PartyEventType, PlaybackState, QueueItem
 from party_service import DEMO_QUEUE_SIZE, DEMO_SONG, PartyService
 from persistence import QueueStore
 
@@ -253,20 +253,23 @@ def test_poll_no_playback_state(service, mock_spotify):
     pytest.assume(service.playback_state == PlaybackState.IDLE)
 
 
-def test_play_next_bumps_skip_version(service, mock_spotify):
+def test_play_next_emits_skipped_event(service, mock_spotify):
     service.start_session("Party", "dev1")
     service.add_to_queue(_make_item(requester="Lisa"))
-    pytest.assume(service.last_skip_version == 0)
+    v = service.version
     service.play_next()
-    pytest.assume(service.last_skip_version == 1)
+    events = service.get_events_since(v)
+    skipped = [e for e in events if e.kind == PartyEventType.SKIPPED]
+    pytest.assume(len(skipped) == 1)
+    pytest.assume(skipped[0].track_uri == "spotify:track:s1")
 
 
-def test_poll_track_end_does_not_bump_skip_version(service, mock_spotify):
+def test_poll_track_end_does_not_emit_skipped(service, mock_spotify):
     service.start_session("Party", "dev1")
     service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
     service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="Mark"))
     service.play_next()
-    skip_v = service.last_skip_version
+    v = service.version
 
     mock_spotify.get_playback_state.return_value = {
         "is_playing": False,
@@ -274,7 +277,10 @@ def test_poll_track_end_does_not_bump_skip_version(service, mock_spotify):
         "progress_ms": 199000,
     }
     service.poll_playback()
-    pytest.assume(service.last_skip_version == skip_v)
+    skipped = [
+        e for e in service.get_events_since(v) if e.kind == PartyEventType.SKIPPED
+    ]
+    pytest.assume(len(skipped) == 0)
 
 
 def test_beaver_enabled_default_false(service):
@@ -315,41 +321,82 @@ def test_get_known_requesters_includes_currently_playing(service, mock_spotify):
     pytest.assume("Dana" in service.get_known_requesters())
 
 
-def test_add_to_queue_bumps_add_version(service):
+def test_add_to_queue_emits_added_event(service):
     service.start_session("Party", "dev1")
-    pytest.assume(service.last_add_version == 0)
+    v = service.version
     service.add_to_queue(_make_item(requester="Lisa"))
-    pytest.assume(service.last_add_version == 1)
-    service.add_to_queue(_make_item("S2", uri="spotify:track:s2", requester="Mark"))
-    pytest.assume(service.last_add_version == 2)
+    events = service.get_events_since(v)
+    added = [e for e in events if e.kind == PartyEventType.ADDED]
+    pytest.assume(len(added) == 1)
+    pytest.assume(added[0].track_uri == "spotify:track:s1")
+    pytest.assume(added[0].is_priority is False)
 
 
-def test_add_to_queue_tracks_last_added_uri(service):
+def test_add_to_queue_event_tracks_uri(service):
     service.start_session("Party", "dev1")
-    pytest.assume(service.last_added_uri is None)
+    v = service.version
     service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
-    pytest.assume(service.last_added_uri == "spotify:track:s1")
     service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="Mark"))
-    pytest.assume(service.last_added_uri == "spotify:track:s2")
+    events = service.get_events_since(v)
+    added = [e for e in events if e.kind == PartyEventType.ADDED]
+    pytest.assume(len(added) == 2)
+    pytest.assume(added[0].track_uri == "spotify:track:s1")
+    pytest.assume(added[1].track_uri == "spotify:track:s2")
 
 
-def test_add_to_queue_tracks_top_flag(service):
+def test_add_to_queue_event_tracks_priority(service):
     service.start_session("Party", "dev1")
-    pytest.assume(service.last_add_was_top is False)
+    v = service.version
     service.add_to_queue(_make_item(requester="Lisa"), top=True)
-    pytest.assume(service.last_add_was_top is True)
     service.add_to_queue(
         _make_item("S2", uri="spotify:track:s2", requester="Mark"), top=False
     )
-    pytest.assume(service.last_add_was_top is False)
+    events = service.get_events_since(v)
+    added = [e for e in events if e.kind == PartyEventType.ADDED]
+    pytest.assume(added[0].is_priority is True)
+    pytest.assume(added[1].is_priority is False)
 
 
-def test_play_next_does_not_bump_add_version(service, mock_spotify):
+def test_play_next_does_not_emit_added(service, mock_spotify):
     service.start_session("Party", "dev1")
     service.add_to_queue(_make_item(requester="Lisa"))
-    add_v = service.last_add_version
+    v = service.version
     service.play_next()
-    pytest.assume(service.last_add_version == add_v)
+    added = [e for e in service.get_events_since(v) if e.kind == PartyEventType.ADDED]
+    pytest.assume(len(added) == 0)
+
+
+def test_move_to_top_emits_event(service):
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item("S1", uri="spotify:track:s1", requester="A"))
+    service.add_to_queue(_make_item("S2", uri="spotify:track:s2", requester="B"))
+    v = service.version
+    uid = service.get_queue()[1].uid
+    service.move_to_top(uid)
+    events = service.get_events_since(v)
+    moved = [e for e in events if e.kind == PartyEventType.MOVED_TO_TOP]
+    pytest.assume(len(moved) == 1)
+    pytest.assume(moved[0].track_uri == "spotify:track:s2")
+
+
+def test_events_pruned_beyond_max(service):
+    service.start_session("Party", "dev1")
+    for i in range(60):
+        service.add_to_queue(
+            _make_item(f"S{i}", uri=f"spotify:track:s{i}", requester="X")
+        )
+    events = service.get_events_since(0)
+    pytest.assume(len(events) <= PartyService.MAX_EVENTS)
+
+
+def test_get_events_since_filters_by_version(service):
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item("S1", uri="spotify:track:s1", requester="A"))
+    v = service.version
+    service.add_to_queue(_make_item("S2", uri="spotify:track:s2", requester="B"))
+    events = service.get_events_since(v)
+    pytest.assume(len(events) == 1)
+    pytest.assume(events[0].track_uri == "spotify:track:s2")
 
 
 def test_session_persists_across_restart(service, mock_spotify, tmp_path):

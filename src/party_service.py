@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from spotipy.exceptions import SpotifyException
 
-from models import PlaybackState, QueueItem
+from models import PartyEvent, PartyEventType, PlaybackState, QueueItem
 from persistence import QueueStore
 
 if TYPE_CHECKING:
@@ -26,16 +26,13 @@ DEMO_QUEUE_SIZE = 50
 
 
 class PartyService:
+    MAX_EVENTS = 50
+
     def __init__(self, spotify: SpotifyClient, store: QueueStore):
         self._spotify = spotify
         self._store = store
         self._version: int = 0
-        self._last_skip_version: int = 0
-        self._last_add_version: int = 0
-        self._last_added_uri: str | None = None
-        self._last_add_was_top: bool = False
-        self._last_move_top_version: int = 0
-        self._last_move_top_uri: str | None = None
+        self._events: list[PartyEvent] = []
         self._beaver_enabled: bool = False
         self._show_qr_code: bool = False
 
@@ -63,29 +60,22 @@ class PartyService:
     def playback_state(self) -> PlaybackState:
         return self._store.playback_state
 
-    @property
-    def last_skip_version(self) -> int:
-        return self._last_skip_version
+    def get_events_since(self, since_version: int) -> list[PartyEvent]:
+        return [e for e in self._events if e.version > since_version]
 
-    @property
-    def last_add_version(self) -> int:
-        return self._last_add_version
-
-    @property
-    def last_added_uri(self) -> str | None:
-        return self._last_added_uri
-
-    @property
-    def last_add_was_top(self) -> bool:
-        return self._last_add_was_top
-
-    @property
-    def last_move_top_version(self) -> int:
-        return self._last_move_top_version
-
-    @property
-    def last_move_top_uri(self) -> str | None:
-        return self._last_move_top_uri
+    def _emit(
+        self, kind: PartyEventType, track_uri: str, *, is_priority: bool = False
+    ) -> None:
+        self._events.append(
+            PartyEvent(
+                kind=kind,
+                track_uri=track_uri,
+                version=self._version,
+                is_priority=is_priority,
+            )
+        )
+        if len(self._events) > self.MAX_EVENTS:
+            self._events = self._events[-self.MAX_EVENTS :]
 
     @property
     def beaver_enabled(self) -> bool:
@@ -133,10 +123,8 @@ class PartyService:
             self._store.set_demo_queue_active(False)
             self._store.clear_queue()
         self._store.add_to_queue(item, top=top)
-        self._last_added_uri = item.track_uri
-        self._last_add_was_top = top
-        self._last_add_version += 1
         self._bump_version()
+        self._emit(PartyEventType.ADDED, item.track_uri, is_priority=top)
 
     def remove_from_queue(self, uid: str) -> None:
         self._store.remove_from_queue(uid)
@@ -147,12 +135,11 @@ class PartyService:
         self._bump_version()
 
     def move_to_top(self, uid: str) -> None:
-        item = next((q for q in self._store.queue if q.uid == uid), None)
-        if item:
-            self._last_move_top_uri = item.track_uri
-            self._last_move_top_version += 1
         self._store.move_to_top(uid)
+        moved = next((q for q in self._store.queue if q.uid == uid), None)
         self._bump_version()
+        if moved:
+            self._emit(PartyEventType.MOVED_TO_TOP, moved.track_uri)
 
     def move_up(self, uid: str) -> None:
         self._store.move_up(uid)
@@ -174,8 +161,8 @@ class PartyService:
             return
         self._spotify.play_track(item.track_uri, device_id=self._store.device_id)
         self._store.set_currently_playing(item, PlaybackState.PLAYING)
-        self._last_skip_version += 1
         self._bump_version()
+        self._emit(PartyEventType.SKIPPED, item.track_uri)
 
     def pause(self) -> None:
         self._spotify.pause(device_id=self._store.device_id)

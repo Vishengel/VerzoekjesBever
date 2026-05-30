@@ -246,9 +246,9 @@ class DJPage:
             with ui.card().classes("w-full bg-gray-800 text-center p-6"):
                 ui.label(state_label).classes("text-gray-400 text-lg")
 
+        queue = self.svc.get_queue()
         with ui.row().classes("w-full items-center justify-between mt-2"):
             ui.label("UP NEXT").classes("text-xs text-gray-400 tracking-widest")
-            queue = self.svc.get_queue()
             if queue:
                 ui.button("Clear queue", on_click=self._confirm_clear_queue).props(
                     "flat dense color=negative size=sm"

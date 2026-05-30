@@ -1,3 +1,5 @@
+import hmac
+
 from nicegui import app, ui
 
 from config import CONFIG
@@ -14,7 +16,9 @@ def login_page():
         return
 
     def try_login():
-        if password_input.value == CONFIG.dj_password.get_secret_value():
+        if hmac.compare_digest(
+            password_input.value, CONFIG.dj_password.get_secret_value()
+        ):
             app.storage.user["authenticated"] = True
             ui.navigate.to("/")
         else:

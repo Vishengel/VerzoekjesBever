@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from uuid import uuid4
 
@@ -7,6 +7,20 @@ class PlaybackState(StrEnum):
     IDLE = "idle"
     PLAYING = "playing"
     PAUSED = "paused"
+
+
+class PartyEventType(StrEnum):
+    ADDED = "added"
+    SKIPPED = "skipped"
+    MOVED_TO_TOP = "moved_to_top"
+
+
+@dataclass(frozen=True)
+class PartyEvent:
+    kind: PartyEventType
+    track_uri: str
+    version: int
+    is_priority: bool = False
 
 
 @dataclass
@@ -19,14 +33,7 @@ class QueueItem:
     uid: str = field(default_factory=lambda: uuid4().hex[:8])
 
     def to_dict(self) -> dict:
-        return {
-            "track_name": self.track_name,
-            "artist": self.artist,
-            "album_art_url": self.album_art_url,
-            "track_uri": self.track_uri,
-            "requester": self.requester,
-            "uid": self.uid,
-        }
+        return asdict(self)
 
     @classmethod
     def from_dict(cls, data: dict) -> "QueueItem":

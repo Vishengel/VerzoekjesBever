@@ -7,6 +7,7 @@ import segno
 from nicegui import ui
 
 from deps import get_service
+from models import PartyEventType
 
 
 def _get_local_ip() -> str:
@@ -55,7 +56,7 @@ def audience_page():
                 ui.label("Check back soon!").classes("text-gray-500")
             return
 
-        pending_add = {"uri": None, "top": False}
+        pending_add = {"uri": None}
         pending_glow = {"uri": None}
 
         @ui.refreshable
@@ -169,54 +170,47 @@ def audience_page():
         qr_overlay()
 
         local_version = {"v": svc.version}
-        local_skip_version = {"v": svc.last_skip_version}
-        local_add_version = {"v": svc.last_add_version}
-        local_move_top_version = {"v": svc.last_move_top_version}
 
         async def check_updates():
-            if svc.version != local_version["v"]:
-                skip_happened = (
-                    svc.beaver_enabled
-                    and svc.last_skip_version > local_skip_version["v"]
-                )
-                add_happened = svc.last_add_version > local_add_version["v"]
-                move_top_happened = (
-                    svc.last_move_top_version > local_move_top_version["v"]
-                )
-                beaver_add = add_happened and svc.beaver_enabled
+            if svc.version == local_version["v"]:
+                return
 
-                local_version["v"] = svc.version
-                local_skip_version["v"] = svc.last_skip_version
-                local_add_version["v"] = svc.last_add_version
-                local_move_top_version["v"] = svc.last_move_top_version
+            events = svc.get_events_since(local_version["v"])
+            local_version["v"] = svc.version
 
-                if skip_happened:
+            for event in events:
+                if event.kind == PartyEventType.SKIPPED and svc.beaver_enabled:
                     await ui.run_javascript("triggerBeaverAnimation()")
                     await asyncio.sleep(2.2)
 
-                if beaver_add:
-                    pending_add["uri"] = svc.last_added_uri
-                    pending_add["top"] = svc.last_add_was_top
+                if event.kind == PartyEventType.ADDED and svc.beaver_enabled:
+                    pending_add["uri"] = event.track_uri
 
-                if move_top_happened:
-                    pending_glow["uri"] = svc.last_move_top_uri
-                elif add_happened and svc.last_add_was_top and not beaver_add:
-                    pending_glow["uri"] = svc.last_added_uri
+                if event.kind == PartyEventType.MOVED_TO_TOP:
+                    pending_glow["uri"] = event.track_uri
+                elif (
+                    event.kind == PartyEventType.ADDED
+                    and event.is_priority
+                    and not svc.beaver_enabled
+                ):
+                    pending_glow["uri"] = event.track_uri
 
-                playlist_display.refresh()
-                qr_overlay.refresh()
+            playlist_display.refresh()
+            qr_overlay.refresh()
 
-                if beaver_add:
-                    is_priority = pending_add["top"]
-                    await ui.run_javascript(
-                        f"triggerBeaverAddAnimation({str(is_priority).lower()})"
-                    )
-                    await asyncio.sleep(3.5 if is_priority else 2.4)
-                    pending_add["uri"] = None
+            if pending_add["uri"]:
+                is_priority = any(
+                    e.kind == PartyEventType.ADDED and e.is_priority for e in events
+                )
+                await ui.run_javascript(
+                    f"triggerBeaverAddAnimation({str(is_priority).lower()})"
+                )
+                await asyncio.sleep(3.5 if is_priority else 2.4)
+                pending_add["uri"] = None
 
-                if pending_glow["uri"]:
-                    await ui.run_javascript("triggerPriorityGlow()")
-                    await asyncio.sleep(2.0)
-                    pending_glow["uri"] = None
+            if pending_glow["uri"]:
+                await ui.run_javascript("triggerPriorityGlow()")
+                await asyncio.sleep(2.0)
+                pending_glow["uri"] = None
 
         ui.timer(1.0, check_updates)

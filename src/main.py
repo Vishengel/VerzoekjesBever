@@ -18,7 +18,7 @@ app.add_static_files("/static", str(Path(__file__).parent / "static"))
 
 async def poll_loop() -> None:
     svc = get_service()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     logger.info("Playback polling started")
     while True:
         try:

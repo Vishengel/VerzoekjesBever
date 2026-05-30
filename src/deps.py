@@ -13,3 +13,8 @@ def get_service() -> PartyService:
         store = QueueStore(CONFIG.queue_store_path)
         _service = PartyService(spotify=spotify, store=store)
     return _service
+
+
+def reset_service() -> None:
+    global _service
+    _service = None
