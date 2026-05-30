@@ -12,6 +12,13 @@ Party song request app. A DJ controls playback through Spotify while an audience
 
 ## Prerequisites
 
+### Network
+
+- The machine running VerzoekjesBever and the Spotify playback device (laptop, phone) must be on the **same local network**
+- The network must allow **mDNS / multicast traffic** between devices. Some guest or corporate Wi-Fi networks block this, which prevents Spotify Connect discovery
+
+### Software & Accounts
+
 - A [Spotify Developer](https://developer.spotify.com/dashboard) app with Client ID, Client Secret, and Redirect URI
 - An active Spotify Premium account (required for playback control)
 - **Either** [Docker](https://docs.docker.com/get-docker/) **or** [uv](https://docs.astral.sh/uv/) (uv downloads the right Python version automatically)
