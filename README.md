@@ -12,9 +12,9 @@ Party song request app. A DJ controls playback through Spotify while an audience
 
 ## Prerequisites
 
-- Python 3.12+
 - A [Spotify Developer](https://developer.spotify.com/dashboard) app with Client ID, Client Secret, and Redirect URI
 - An active Spotify Premium account (required for playback control)
+- **Either** [Docker](https://docs.docker.com/get-docker/) **or** [uv](https://docs.astral.sh/uv/) (uv downloads the right Python version automatically)
 
 ## Configuration
 
@@ -30,7 +30,9 @@ SPOTIPY_CLIENT_SECRET=your-client-secret
 SPOTIPY_REDIRECT_URI=http://localhost:8000/callback
 ```
 
-## Installing uv
+## Setup with uv
+
+### Installing uv
 
 [uv](https://docs.astral.sh/uv/) is a fast Python package manager.
 
@@ -41,8 +43,6 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Windows
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
-
-## Setup with uv
 
 ```sh
 uv sync
