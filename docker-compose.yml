@@ -1,6 +1,6 @@
 services:
   verzoekjesbever:
-    build: .
+    image: ghcr.io/vishengel/verzoekjesbever:latest
     ports:
       - "8000:8000"
     env_file:
