@@ -58,12 +58,15 @@ function triggerBeaverAddAnimation(isPriority) {
     var beaver = document.createElement('span');
     beaver.className = 'beaver-actor';
     beaver.style.animation = keyframes[pick].beaver + ' ' + duration + 's ease-in-out forwards';
+    var beaverEmoji = document.createElement('span');
+    beaverEmoji.className = 'beaver-emoji';
+    beaverEmoji.textContent = '🦫';
+    beaver.appendChild(beaverEmoji);
     if (isPriority) {
-        beaver.textContent = '🦫👑';
-    } else if (pick === 'build') {
-        beaver.textContent = '🦫🪖';
-    } else {
-        beaver.textContent = '🦫';
+        var accessory = document.createElement('span');
+        accessory.className = 'beaver-accessory';
+        accessory.textContent = '👑';
+        beaver.appendChild(accessory);
     }
     overlay.appendChild(beaver);
     wrapper.appendChild(overlay);
