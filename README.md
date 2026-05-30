@@ -27,8 +27,9 @@ cp .example.env .env
 ```
 SPOTIPY_CLIENT_ID=your-client-id
 SPOTIPY_CLIENT_SECRET=your-client-secret
-SPOTIPY_REDIRECT_URI=http://localhost:8000/callback
 ```
+
+The redirect URI defaults to `http://127.0.0.1:8000/auth/spotify/callback`. Add the same URI to your Spotify app's Redirect URI settings in the developer dashboard.
 
 ## Setup with uv
 
