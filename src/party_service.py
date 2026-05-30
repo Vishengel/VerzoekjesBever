@@ -34,7 +34,7 @@ class PartyService:
         self._last_add_version: int = 0
         self._last_added_uri: str | None = None
         self._last_add_was_top: bool = False
-        self._beaver_enabled: bool = True
+        self._beaver_enabled: bool = False
         self._show_qr_code: bool = False
 
     @property

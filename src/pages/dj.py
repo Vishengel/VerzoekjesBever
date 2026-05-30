@@ -46,7 +46,7 @@ class DJPage:
 
     def _build_header(self):
         with ui.row().classes("w-full items-center justify-between"):
-            ui.label("🦫 VerzoekjesBever — DJ").classes("text-2xl font-bold")
+            ui.label("🦫 VerzoekjesBever - DJ").classes("text-2xl font-bold")
             with ui.row().classes("gap-2"):
 
                 @ui.refreshable

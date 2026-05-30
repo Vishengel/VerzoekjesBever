@@ -122,7 +122,7 @@
     overflow: visible;
 }
 
-/* Carry — beaver slides from left, pushes card into view */
+/* Carry: beaver slides from left, pushes card into view */
 @keyframes carry-beaver-slide {
     0% { transform: translateX(-150%) rotate(-10deg); }
     30% { transform: translateX(-10%) rotate(5deg); }
@@ -145,7 +145,7 @@
     margin-top: -40px;
 }
 
-/* Toss — beaver pops up from below, flings card upward */
+/* Toss: beaver pops up from below, flings card upward */
 @keyframes toss-beaver-popup {
     0% { transform: translateY(200%); }
     25% { transform: translateY(-10%); }
@@ -168,7 +168,7 @@
     margin-left: -40px;
 }
 
-/* Build — beaver hammers card into existence */
+/* Build: beaver hammers card into existence */
 @keyframes build-beaver-hammer {
     0% { transform: translateY(-100%) rotate(0deg); opacity: 0; }
     15% { transform: translateY(0%) rotate(0deg); opacity: 1; }
@@ -197,7 +197,7 @@
     margin-left: -40px;
 }
 
-/* Priority glow — golden pulse after card reveal */
+/* Priority glow: golden pulse after card reveal */
 @keyframes priority-glow {
     0% { box-shadow: 0 0 0 rgba(255, 215, 0, 0); }
     50% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.6), 0 0 40px rgba(255, 215, 0, 0.3); }

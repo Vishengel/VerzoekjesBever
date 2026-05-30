@@ -1,7 +1,7 @@
 [project]
 name = "verzoekjesbever"
 version = "0.1.0"
-description = "Party song request app — manage Spotify playlists with a DJ interface and audience beamer display"
+description = "Party song request app: manage Spotify playlists with a DJ interface and audience beamer display"
 requires-python = ">=3.12"
 dependencies = [
     "spotipy>=2.26.0",
