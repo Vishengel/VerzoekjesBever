@@ -27,7 +27,12 @@ cp .example.env .env
 ```
 SPOTIPY_CLIENT_ID=your-client-id
 SPOTIPY_CLIENT_SECRET=your-client-secret
+DJ_PASSWORD=your-dj-password
 ```
+
+Set `DJ_PASSWORD` to protect the DJ dashboard and setup page behind a login. Leave it empty to disable authentication (anyone with the URL can control playback).
+
+The `/display` route is always public so party guests can view the queue on their phones.
 
 The redirect URI defaults to `http://127.0.0.1:8000/auth/spotify/callback`. Add the same URI to your Spotify app's Redirect URI settings in the developer dashboard.
 

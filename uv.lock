@@ -1397,7 +1397,6 @@ dependencies = [
     { name = "nicegui" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
-    { name = "pytest" },
     { name = "spotipy" },
 ]
 
@@ -1413,7 +1412,6 @@ requires-dist = [
     { name = "nicegui", specifier = ">=2.20.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pydantic-settings", specifier = ">=2.0.0" },
-    { name = "pytest", specifier = ">=9.0.3" },
     { name = "spotipy", specifier = ">=2.26.0" },
 ]
 

@@ -13,6 +13,8 @@ class Config(BaseSettings):
     spotipy_client_secret: SecretStr
     spotipy_redirect_uri: str = "http://127.0.0.1:8000/auth/spotify/callback"
 
+    dj_password: str = ""
+
     queue_store_path: Path = project_root / "data" / "session.json"
 
     model_config = SettingsConfigDict(

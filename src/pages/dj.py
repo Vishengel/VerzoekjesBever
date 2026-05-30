@@ -1,13 +1,17 @@
 from dataclasses import replace
 
-from nicegui import ui
+from nicegui import app, ui
 
+from config import CONFIG
 from deps import get_service
 from models import PlaybackState, QueueItem
 
 
 @ui.page("/dj", title="VerzoekjesBever - DJ", dark=True)
 def dj_page():
+    if CONFIG.dj_password and not app.storage.user.get("authenticated"):
+        ui.navigate.to("/login")
+        return
     svc = get_service()
     if not svc.has_session:
         ui.navigate.to("/")

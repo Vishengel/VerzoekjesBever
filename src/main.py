@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import logging
 import os
 from pathlib import Path
@@ -6,8 +7,9 @@ from pathlib import Path
 from nicegui import app, background_tasks, ui
 from spotipy.exceptions import SpotifyException
 
+from config import CONFIG
 from deps import get_service
-from pages import audience, dj, startup  # noqa: F401
+from pages import audience, dj, login, startup  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,11 @@ def main():
 
     reload = os.getenv("NICEGUI_RELOAD", "").lower() == "true"
     background_tasks.create_or_defer(poll_loop(), name="spotify-poll")
+
+    storage_secret = hashlib.sha256(
+        f"verzoekjesbever-{CONFIG.dj_password}".encode()
+    ).hexdigest()
+
     ui.run(
         title="VerzoekjesBever",
         favicon="🦫",
@@ -39,6 +46,7 @@ def main():
         reload=reload,
         show=False,
         port=8000,
+        storage_secret=storage_secret,
     )
 
 

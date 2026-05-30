@@ -1,10 +1,14 @@
-from nicegui import ui
+from nicegui import app, ui
 
+from config import CONFIG
 from deps import get_service
 
 
 @ui.page("/", title="VerzoekjesBever - Setup", dark=True)
 def setup_page():
+    if CONFIG.dj_password and not app.storage.user.get("authenticated"):
+        ui.navigate.to("/login")
+        return
     svc = get_service()
 
     with ui.column().classes("w-full max-w-lg mx-auto mt-16 gap-6"):
