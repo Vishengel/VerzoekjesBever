@@ -15,20 +15,25 @@ class SpotifyClient:
 
     def __init__(self):
         CONFIG.cache_dir.mkdir(parents=True, exist_ok=True)
-        self._sp = Spotify(
-            auth_manager=SpotifyOAuth(
-                client_id=CONFIG.spotipy_client_id,
-                client_secret=CONFIG.spotipy_client_secret.get_secret_value(),
-                redirect_uri=CONFIG.spotipy_redirect_uri,
-                scope=self.SCOPE,
-                cache_handler=CacheFileHandler(
-                    cache_path=CONFIG.cache_dir / "credentials"
-                ),
-            )
+        self._auth_manager = SpotifyOAuth(
+            client_id=CONFIG.spotipy_client_id,
+            client_secret=CONFIG.spotipy_client_secret.get_secret_value(),
+            redirect_uri=CONFIG.spotipy_redirect_uri,
+            scope=self.SCOPE,
+            cache_handler=CacheFileHandler(cache_path=CONFIG.cache_dir / "credentials"),
+            open_browser=False,
         )
+        self._sp = Spotify(auth_manager=self._auth_manager)
 
-    def ensure_authenticated(self) -> None:
-        self._sp.current_user()
+    def is_authenticated(self) -> bool:
+        token = self._auth_manager.cache_handler.get_cached_token()
+        return self._auth_manager.validate_token(token) is not None
+
+    def get_auth_url(self) -> str:
+        return self._auth_manager.get_authorize_url()
+
+    def handle_auth_callback(self, code: str) -> None:
+        self._auth_manager.get_access_token(code=code, as_dict=False)
 
     def search_tracks(self, query: str, limit: int = 10) -> list[QueueItem]:
         results = self._sp.search(q=query, type="track", limit=limit)
