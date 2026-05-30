@@ -65,9 +65,23 @@ The app runs at [http://localhost:8000](http://localhost:8000).
 
 ## Setup with Docker
 
-A multi-platform image is published to GHCR on every push to `master`. Docker Compose pulls it by default.
+A multi-platform image is published to GHCR on every push to `master`.
 
-### Run (pre-built image)
+### Quick start (no clone needed)
+
+```sh
+docker run -d \
+  -p 8000:8000 \
+  -e SPOTIPY_CLIENT_ID=your-client-id \
+  -e SPOTIPY_CLIENT_SECRET=your-client-secret \
+  -e DJ_PASSWORD=your-dj-password \
+  -v ./data:/app/data \
+  -v ./cache:/app/cache \
+  --restart unless-stopped \
+  ghcr.io/vishengel/verzoekjesbever:latest
+```
+
+### Run with Docker Compose (pre-built image)
 
 ```sh
 docker compose up
