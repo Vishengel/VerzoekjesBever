@@ -103,14 +103,14 @@ class DJPage:
             )
 
     def _build_search_input(self):
-        search_input = ui.input(placeholder="Search song or artist...").classes(
-            "w-full"
-        )
-        search_input.on("input", self._on_search_input)
+        search_input = ui.input(
+            placeholder="Search song or artist...",
+            on_change=self._on_search_input,
+        ).classes("w-full")
         search_input.on("keydown.enter", lambda: self._do_search(search_input.value))
 
     def _on_search_input(self, e):
-        query = e.sender.value
+        query = e.value
         if self._search_timer:
             self._search_timer.deactivate()
         if not query or len(query) < 2:
