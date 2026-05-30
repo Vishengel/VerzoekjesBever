@@ -9,7 +9,7 @@ from spotipy.exceptions import SpotifyException
 
 from config import CONFIG
 from deps import get_service
-from pages import audience, benchmark, dj, login, startup  # noqa: F401
+from pages import audience, benchmark, dj, login, spotify_auth, startup  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -22,16 +22,14 @@ async def poll_loop() -> None:
     logger.info("Playback polling started")
     while True:
         try:
-            await loop.run_in_executor(None, svc.poll_playback)
+            if svc.is_authenticated():
+                await loop.run_in_executor(None, svc.poll_playback)
         except SpotifyException:
             logger.error("Polling error", exc_info=True)
         await asyncio.sleep(3.0)
 
 
 def main():
-    svc = get_service()
-    svc.ensure_authenticated()
-
     reload = os.getenv("NICEGUI_RELOAD", "").lower() == "true"
     background_tasks.create_or_defer(poll_loop(), name="spotify-poll")
 
