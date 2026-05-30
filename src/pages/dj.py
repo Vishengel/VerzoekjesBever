@@ -9,7 +9,9 @@ from models import PlaybackState, QueueItem
 
 @ui.page("/dj", title="VerzoekjesBever - DJ", dark=True)
 def dj_page():
-    if CONFIG.dj_password and not app.storage.user.get("authenticated"):
+    if CONFIG.dj_password.get_secret_value() and not app.storage.user.get(
+        "authenticated"
+    ):
         ui.navigate.to("/login")
         return
     svc = get_service()

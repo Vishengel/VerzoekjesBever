@@ -6,7 +6,9 @@ from deps import get_service
 
 @ui.page("/", title="VerzoekjesBever - Setup", dark=True)
 def setup_page():
-    if CONFIG.dj_password and not app.storage.user.get("authenticated"):
+    if CONFIG.dj_password.get_secret_value() and not app.storage.user.get(
+        "authenticated"
+    ):
         ui.navigate.to("/login")
         return
     svc = get_service()

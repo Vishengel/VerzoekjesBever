@@ -5,7 +5,7 @@ from config import CONFIG
 
 @ui.page("/login", title="VerzoekjesBever - Login", dark=True)
 def login_page():
-    if not CONFIG.dj_password:
+    if not CONFIG.dj_password.get_secret_value():
         ui.navigate.to("/")
         return
 
@@ -14,7 +14,7 @@ def login_page():
         return
 
     def try_login():
-        if password_input.value == CONFIG.dj_password:
+        if password_input.value == CONFIG.dj_password.get_secret_value():
             app.storage.user["authenticated"] = True
             ui.navigate.to("/")
         else:

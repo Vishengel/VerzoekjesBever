@@ -36,7 +36,7 @@ def main():
     background_tasks.create_or_defer(poll_loop(), name="spotify-poll")
 
     storage_secret = hashlib.sha256(
-        f"verzoekjesbever-{CONFIG.dj_password}".encode()
+        f"verzoekjesbever-{CONFIG.dj_password.get_secret_value()}".encode()
     ).hexdigest()
 
     ui.run(
