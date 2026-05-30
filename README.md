@@ -15,7 +15,6 @@ Party song request app. A DJ controls playback through Spotify while an audience
 ### Network
 
 - The machine running VerzoekjesBever and the Spotify playback device (laptop, phone) must be on the **same local network**
-- The network must allow **mDNS / multicast traffic** between devices. Some guest or corporate Wi-Fi networks block this, which prevents Spotify Connect discovery
 
 ### Software & Accounts
 
