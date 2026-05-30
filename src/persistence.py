@@ -111,6 +111,10 @@ class QueueStore:
                 names.add(item.requester)
         return sorted(names)
 
+    def set_demo_queue_active(self, active: bool) -> None:
+        self.demo_queue_active = active
+        self._save()
+
     def set_device(self, device_id: str) -> None:
         self.device_id = device_id
         self._save()

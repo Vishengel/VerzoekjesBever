@@ -96,8 +96,7 @@ class PartyService:
     def fill_demo_queue(self) -> None:
         for _ in range(DEMO_QUEUE_SIZE):
             self._store.add_to_queue(DEMO_SONG)
-        self._store.demo_queue_active = True
-        self._store._save()
+        self._store.set_demo_queue_active(True)
 
     def search_songs(self, query: str) -> list[QueueItem]:
         tracks = self._spotify.search_tracks(query)
@@ -105,7 +104,7 @@ class PartyService:
 
     def add_to_queue(self, item: QueueItem, top: bool = False) -> None:
         if self._store.demo_queue_active:
-            self._store.demo_queue_active = False
+            self._store.set_demo_queue_active(False)
             self._store.clear_queue()
         self._store.add_to_queue(item, top=top)
         self._last_added_uri = item.track_uri

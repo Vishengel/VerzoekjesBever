@@ -5,7 +5,7 @@ import pytest
 from spotipy.exceptions import SpotifyException
 
 from models import PlaybackState, QueueItem
-from party_service import PartyService
+from party_service import DEMO_QUEUE_SIZE, DEMO_SONG, PartyService
 from persistence import QueueStore
 
 
@@ -89,7 +89,8 @@ def test_add_to_queue_top(service):
 def test_remove_from_queue(service):
     service.start_session("Party", "dev1")
     service.add_to_queue(_make_item(requester="Lisa"))
-    service.remove_from_queue("spotify:track:s1")
+    uid = service.get_queue()[0].uid
+    service.remove_from_queue(uid)
     pytest.assume(service.get_queue() == [])
 
 
@@ -98,7 +99,8 @@ def test_move_to_top(service):
     service.add_to_queue(_make_item("S1", uri="spotify:track:s1", requester="A"))
     service.add_to_queue(_make_item("S2", uri="spotify:track:s2", requester="B"))
     service.add_to_queue(_make_item("S3", uri="spotify:track:s3", requester="C"))
-    service.move_to_top("spotify:track:s3")
+    uid = service.get_queue()[2].uid
+    service.move_to_top(uid)
     pytest.assume(service.get_queue()[0].track_name == "S3")
 
 
@@ -107,7 +109,8 @@ def test_move_up(service):
     service.add_to_queue(_make_item("S1", uri="spotify:track:s1", requester="A"))
     service.add_to_queue(_make_item("S2", uri="spotify:track:s2", requester="B"))
     service.add_to_queue(_make_item("S3", uri="spotify:track:s3", requester="C"))
-    service.move_up("spotify:track:s3")
+    uid = service.get_queue()[2].uid
+    service.move_up(uid)
     pytest.assume(service.get_queue()[1].track_name == "S3")
     pytest.assume(service.get_queue()[2].track_name == "S2")
 
@@ -117,7 +120,8 @@ def test_move_down(service):
     service.add_to_queue(_make_item("S1", uri="spotify:track:s1", requester="A"))
     service.add_to_queue(_make_item("S2", uri="spotify:track:s2", requester="B"))
     service.add_to_queue(_make_item("S3", uri="spotify:track:s3", requester="C"))
-    service.move_down("spotify:track:s1")
+    uid = service.get_queue()[0].uid
+    service.move_down(uid)
     pytest.assume(service.get_queue()[0].track_name == "S2")
     pytest.assume(service.get_queue()[1].track_name == "S1")
 
@@ -127,7 +131,8 @@ def test_move_up_bumps_version(service):
     service.add_to_queue(_make_item("S1", uri="spotify:track:s1"))
     service.add_to_queue(_make_item("S2", uri="spotify:track:s2"))
     v = service.version
-    service.move_up("spotify:track:s2")
+    uid = service.get_queue()[1].uid
+    service.move_up(uid)
     pytest.assume(service.version == v + 1)
 
 
@@ -136,7 +141,8 @@ def test_move_down_bumps_version(service):
     service.add_to_queue(_make_item("S1", uri="spotify:track:s1"))
     service.add_to_queue(_make_item("S2", uri="spotify:track:s2"))
     v = service.version
-    service.move_down("spotify:track:s1")
+    uid = service.get_queue()[0].uid
+    service.move_down(uid)
     pytest.assume(service.version == v + 1)
 
 
@@ -285,8 +291,9 @@ def test_set_beaver_enabled(service):
 def test_update_requester(service):
     service.start_session("Party", "dev1")
     service.add_to_queue(_make_item(uri="spotify:track:s1", requester="Typo"))
+    uid = service.get_queue()[0].uid
     v = service.version
-    service.update_requester("spotify:track:s1", "Fixed")
+    service.update_requester(uid, "Fixed")
     pytest.assume(service.get_queue()[0].requester == "Fixed")
     pytest.assume(service.version > v)
 
@@ -458,3 +465,56 @@ def test_poll_track_ended_play_fails_requeues(service, mock_spotify):
     pytest.assume(service.playback_state == PlaybackState.IDLE)
     pytest.assume(len(service.get_queue()) == 1)
     pytest.assume(service.get_queue()[0].track_name == "Song2")
+
+
+# --- Demo queue ---
+
+
+def test_start_session_with_demo(service):
+    service.start_session("Party", "dev1", demo=True)
+    pytest.assume(len(service.get_queue()) == DEMO_QUEUE_SIZE)
+    pytest.assume(service.demo_queue_active is True)
+    pytest.assume(service.get_queue()[0].track_name == DEMO_SONG.track_name)
+    pytest.assume(service.get_queue()[0].requester == "🦫")
+
+
+def test_demo_queue_all_unique_uids(service):
+    service.start_session("Party", "dev1", demo=True)
+    uids = [item.uid for item in service.get_queue()]
+    pytest.assume(len(set(uids)) == DEMO_QUEUE_SIZE)
+
+
+def test_demo_queue_cleared_on_first_add(service):
+    service.start_session("Party", "dev1", demo=True)
+    pytest.assume(len(service.get_queue()) == DEMO_QUEUE_SIZE)
+
+    real_song = _make_item("Real Song", uri="spotify:track:real", requester="Alice")
+    service.add_to_queue(real_song)
+
+    pytest.assume(len(service.get_queue()) == 1)
+    pytest.assume(service.get_queue()[0].track_name == "Real Song")
+    pytest.assume(service.demo_queue_active is False)
+
+
+def test_demo_queue_second_add_normal(service):
+    service.start_session("Party", "dev1", demo=True)
+    service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="A"))
+    service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="B"))
+    pytest.assume(len(service.get_queue()) == 2)
+
+
+def test_demo_queue_persists_across_restart(mock_spotify, tmp_path):
+    store1 = QueueStore(tmp_path / "session.json")
+    svc1 = PartyService(spotify=mock_spotify, store=store1)
+    svc1.start_session("Party", "dev1", demo=True)
+
+    store2 = QueueStore(tmp_path / "session.json")
+    svc2 = PartyService(spotify=mock_spotify, store=store2)
+    pytest.assume(svc2.demo_queue_active is True)
+    pytest.assume(len(svc2.get_queue()) == DEMO_QUEUE_SIZE)
+
+
+def test_start_session_without_demo(service):
+    service.start_session("Party", "dev1", demo=False)
+    pytest.assume(len(service.get_queue()) == 0)
+    pytest.assume(service.demo_queue_active is False)

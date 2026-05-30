@@ -45,13 +45,12 @@ def test_queue_item_to_dict():
         track_uri="spotify:track:dq",
     )
     d = item.to_dict()
-    pytest.assume(d == {
-        "track_name": "Dancing Queen",
-        "artist": "ABBA",
-        "album_art_url": "https://img.com/dq.jpg",
-        "track_uri": "spotify:track:dq",
-        "requester": "Lisa",
-    })
+    pytest.assume(d["track_name"] == "Dancing Queen")
+    pytest.assume(d["artist"] == "ABBA")
+    pytest.assume(d["album_art_url"] == "https://img.com/dq.jpg")
+    pytest.assume(d["track_uri"] == "spotify:track:dq")
+    pytest.assume(d["requester"] == "Lisa")
+    pytest.assume("uid" in d)
 
 
 def test_queue_item_from_dict():
@@ -69,7 +68,11 @@ def test_queue_item_from_dict():
 
 def test_queue_item_roundtrip():
     item = QueueItem(
-        track_name="Song", artist="Art", album_art_url="", requester="X", track_uri="spotify:track:abc"
+        track_name="Song",
+        artist="Art",
+        album_art_url="",
+        requester="X",
+        track_uri="spotify:track:abc",
     )
     pytest.assume(QueueItem.from_dict(item.to_dict()) == item)
 

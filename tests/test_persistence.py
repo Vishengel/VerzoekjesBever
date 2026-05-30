@@ -37,7 +37,17 @@ def test_add_to_queue_bottom(tmp_path: Path):
     store.start_session("Party", "dev1")
     item = _make_item("Song1")
     store.add_to_queue(item)
-    pytest.assume(store.queue == [item])
+    pytest.assume(len(store.queue) == 1)
+    pytest.assume(store.queue[0].track_name == "Song1")
+
+
+def test_add_to_queue_assigns_fresh_uid(tmp_path: Path):
+    store = QueueStore(tmp_path / "session.json")
+    store.start_session("Party", "dev1")
+    item = _make_item("Song1")
+    original_uid = item.uid
+    store.add_to_queue(item)
+    pytest.assume(store.queue[0].uid != original_uid)
 
 
 def test_add_to_queue_top(tmp_path: Path):
@@ -53,7 +63,8 @@ def test_remove_from_queue(tmp_path: Path):
     store = QueueStore(tmp_path / "session.json")
     store.start_session("Party", "dev1")
     store.add_to_queue(_make_item("Song1"))
-    store.remove_from_queue("spotify:track:Song1")
+    uid = store.queue[0].uid
+    store.remove_from_queue(uid)
     pytest.assume(store.queue == [])
 
 
@@ -107,7 +118,8 @@ def test_move_to_top(tmp_path: Path):
     store.add_to_queue(_make_item("Song1"))
     store.add_to_queue(_make_item("Song2"))
     store.add_to_queue(_make_item("Song3"))
-    store.move_to_top("spotify:track:Song3")
+    uid = store.queue[2].uid
+    store.move_to_top(uid)
     pytest.assume(store.queue[0].track_name == "Song3")
 
 
@@ -117,7 +129,8 @@ def test_move_up(tmp_path: Path):
     store.add_to_queue(_make_item("Song1"))
     store.add_to_queue(_make_item("Song2"))
     store.add_to_queue(_make_item("Song3"))
-    store.move_up("spotify:track:Song2")
+    uid = store.queue[1].uid
+    store.move_up(uid)
     pytest.assume(store.queue[0].track_name == "Song2")
     pytest.assume(store.queue[1].track_name == "Song1")
     pytest.assume(store.queue[2].track_name == "Song3")
@@ -128,16 +141,17 @@ def test_move_up_first_item_noop(tmp_path: Path):
     store.start_session("Party", "dev1")
     store.add_to_queue(_make_item("Song1"))
     store.add_to_queue(_make_item("Song2"))
-    store.move_up("spotify:track:Song1")
+    uid = store.queue[0].uid
+    store.move_up(uid)
     pytest.assume(store.queue[0].track_name == "Song1")
     pytest.assume(store.queue[1].track_name == "Song2")
 
 
-def test_move_up_unknown_uri_noop(tmp_path: Path):
+def test_move_up_unknown_uid_noop(tmp_path: Path):
     store = QueueStore(tmp_path / "session.json")
     store.start_session("Party", "dev1")
     store.add_to_queue(_make_item("Song1"))
-    store.move_up("spotify:track:nonexistent")
+    store.move_up("nonexistent")
     pytest.assume(len(store.queue) == 1)
 
 
@@ -147,7 +161,8 @@ def test_move_down(tmp_path: Path):
     store.add_to_queue(_make_item("Song1"))
     store.add_to_queue(_make_item("Song2"))
     store.add_to_queue(_make_item("Song3"))
-    store.move_down("spotify:track:Song2")
+    uid = store.queue[1].uid
+    store.move_down(uid)
     pytest.assume(store.queue[0].track_name == "Song1")
     pytest.assume(store.queue[1].track_name == "Song3")
     pytest.assume(store.queue[2].track_name == "Song2")
@@ -158,16 +173,17 @@ def test_move_down_last_item_noop(tmp_path: Path):
     store.start_session("Party", "dev1")
     store.add_to_queue(_make_item("Song1"))
     store.add_to_queue(_make_item("Song2"))
-    store.move_down("spotify:track:Song2")
+    uid = store.queue[1].uid
+    store.move_down(uid)
     pytest.assume(store.queue[0].track_name == "Song1")
     pytest.assume(store.queue[1].track_name == "Song2")
 
 
-def test_move_down_unknown_uri_noop(tmp_path: Path):
+def test_move_down_unknown_uid_noop(tmp_path: Path):
     store = QueueStore(tmp_path / "session.json")
     store.start_session("Party", "dev1")
     store.add_to_queue(_make_item("Song1"))
-    store.move_down("spotify:track:nonexistent")
+    store.move_down("nonexistent")
     pytest.assume(len(store.queue) == 1)
 
 
@@ -187,6 +203,17 @@ def test_persistence_survives_reload(tmp_path: Path):
     pytest.assume(store2.playback_state == PlaybackState.PLAYING)
 
 
+def test_uid_survives_reload(tmp_path: Path):
+    path = tmp_path / "session.json"
+    store1 = QueueStore(path)
+    store1.start_session("Party", "dev1")
+    store1.add_to_queue(_make_item("Song1"))
+    uid = store1.queue[0].uid
+
+    store2 = QueueStore(path)
+    pytest.assume(store2.queue[0].uid == uid)
+
+
 def test_has_session(tmp_path: Path):
     store = QueueStore(tmp_path / "session.json")
     pytest.assume(not store.has_session)
@@ -198,7 +225,8 @@ def test_update_requester_in_queue(tmp_path: Path):
     store = QueueStore(tmp_path / "session.json")
     store.start_session("Party", "dev1")
     store.add_to_queue(_make_item("Song1", requester="Typo"))
-    store.update_requester("spotify:track:Song1", "Corrected")
+    uid = store.queue[0].uid
+    store.update_requester(uid, "Corrected")
     pytest.assume(store.queue[0].requester == "Corrected")
 
 
@@ -207,7 +235,7 @@ def test_update_requester_currently_playing(tmp_path: Path):
     store.start_session("Party", "dev1")
     item = _make_item("Song1", requester="Typo")
     store.set_currently_playing(item, PlaybackState.PLAYING)
-    store.update_requester("spotify:track:Song1", "Fixed")
+    store.update_requester(item.uid, "Fixed")
     pytest.assume(store.currently_playing.requester == "Fixed")
 
 
@@ -216,7 +244,8 @@ def test_update_requester_persists(tmp_path: Path):
     store = QueueStore(path)
     store.start_session("Party", "dev1")
     store.add_to_queue(_make_item("Song1", requester="Old"))
-    store.update_requester("spotify:track:Song1", "New")
+    uid = store.queue[0].uid
+    store.update_requester(uid, "New")
     store2 = QueueStore(path)
     pytest.assume(store2.queue[0].requester == "New")
 
@@ -273,3 +302,46 @@ def test_atomic_write_produces_valid_file(tmp_path: Path):
     store.add_to_queue(_make_item("Song1"))
     tmp_file = path.with_suffix(".tmp")
     pytest.assume(not tmp_file.exists())
+
+
+def test_demo_queue_active_default_false(tmp_path: Path):
+    store = QueueStore(tmp_path / "session.json")
+    pytest.assume(store.demo_queue_active is False)
+
+
+def test_demo_queue_active_persists(tmp_path: Path):
+    path = tmp_path / "session.json"
+    store1 = QueueStore(path)
+    store1.start_session("Party", "dev1")
+    store1.set_demo_queue_active(True)
+
+    store2 = QueueStore(path)
+    pytest.assume(store2.demo_queue_active is True)
+
+
+def test_start_session_resets_demo_queue(tmp_path: Path):
+    store = QueueStore(tmp_path / "session.json")
+    store.set_demo_queue_active(True)
+    store.start_session("Party", "dev1")
+    pytest.assume(store.demo_queue_active is False)
+
+
+def test_duplicate_track_uri_unique_uids(tmp_path: Path):
+    store = QueueStore(tmp_path / "session.json")
+    store.start_session("Party", "dev1")
+    item = _make_item("Song1")
+    store.add_to_queue(item)
+    store.add_to_queue(item)
+    pytest.assume(store.queue[0].uid != store.queue[1].uid)
+    pytest.assume(store.queue[0].track_uri == store.queue[1].track_uri)
+
+
+def test_remove_by_uid_only_removes_one_duplicate(tmp_path: Path):
+    store = QueueStore(tmp_path / "session.json")
+    store.start_session("Party", "dev1")
+    item = _make_item("Song1")
+    store.add_to_queue(item)
+    store.add_to_queue(item)
+    uid_to_remove = store.queue[0].uid
+    store.remove_from_queue(uid_to_remove)
+    pytest.assume(len(store.queue) == 1)
