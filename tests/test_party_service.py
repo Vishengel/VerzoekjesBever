@@ -4,9 +4,15 @@ from unittest.mock import MagicMock
 import pytest
 from spotipy.exceptions import SpotifyException
 
-from models import PartyEventType, PlaybackInfo, PlaybackState, QueueItem
+from models import (
+    PartyEventType,
+    PlaybackInfo,
+    PlaybackSignal,
+    PlaybackState,
+    QueueItem,
+)
 from adem_mode import ADEM_MODE_QUEUE_SIZE, ADEMNOOD_ITEM
-from party_service import PartyService
+from party_service import PartyService, detect_playback_signal
 from persistence import QueueStore
 
 
@@ -721,3 +727,126 @@ def test_get_auth_url(service, mock_spotify):
 def test_handle_auth_callback(service, mock_spotify):
     service.handle_auth_callback("test-code")
     mock_spotify.handle_auth_callback.assert_called_once_with("test-code")
+
+
+# --- detect_playback_signal ---
+
+_SIG_URI = "spotify:track:abc"
+
+
+def _playing_info(track_uri=_SIG_URI, progress_ms=10000, duration_ms=200000):
+    return PlaybackInfo(
+        is_playing=True,
+        progress_ms=progress_ms,
+        duration_ms=duration_ms,
+        track_uri=track_uri,
+    )
+
+
+def _paused_info(track_uri=_SIG_URI, progress_ms=10000, duration_ms=200000):
+    return PlaybackInfo(
+        is_playing=False,
+        progress_ms=progress_ms,
+        duration_ms=duration_ms,
+        track_uri=track_uri,
+    )
+
+
+def test_signal_no_info_no_current_track():
+    result = detect_playback_signal(
+        info=None,
+        current_track_uri=None,
+        our_state=PlaybackState.PLAYING,
+        in_settle_period=False,
+    )
+    pytest.assume(result == PlaybackSignal.NOTHING)
+
+
+def test_signal_no_info_has_current_in_settle():
+    result = detect_playback_signal(
+        info=None,
+        current_track_uri=_SIG_URI,
+        our_state=PlaybackState.PLAYING,
+        in_settle_period=True,
+    )
+    pytest.assume(result == PlaybackSignal.NOTHING)
+
+
+def test_signal_no_info_has_current_not_in_settle():
+    result = detect_playback_signal(
+        info=None,
+        current_track_uri=_SIG_URI,
+        our_state=PlaybackState.PLAYING,
+        in_settle_period=False,
+    )
+    pytest.assume(result == PlaybackSignal.TRACK_LOST)
+
+
+def test_signal_wrong_track_in_settle():
+    result = detect_playback_signal(
+        info=_playing_info(track_uri="spotify:track:other"),
+        current_track_uri=_SIG_URI,
+        our_state=PlaybackState.PLAYING,
+        in_settle_period=True,
+    )
+    pytest.assume(result == PlaybackSignal.NOTHING)
+
+
+def test_signal_wrong_track_not_in_settle():
+    result = detect_playback_signal(
+        info=_playing_info(track_uri="spotify:track:other"),
+        current_track_uri=_SIG_URI,
+        our_state=PlaybackState.PLAYING,
+        in_settle_period=False,
+    )
+    pytest.assume(result == PlaybackSignal.TRACK_LOST)
+
+
+def test_signal_track_ended():
+    result = detect_playback_signal(
+        info=_paused_info(progress_ms=198000, duration_ms=200000),
+        current_track_uri=_SIG_URI,
+        our_state=PlaybackState.PLAYING,
+        in_settle_period=False,
+    )
+    pytest.assume(result == PlaybackSignal.TRACK_ENDED)
+
+
+def test_signal_external_resume():
+    result = detect_playback_signal(
+        info=_playing_info(),
+        current_track_uri=_SIG_URI,
+        our_state=PlaybackState.PAUSED,
+        in_settle_period=False,
+    )
+    pytest.assume(result == PlaybackSignal.EXTERNAL_RESUME)
+
+
+def test_signal_external_pause():
+    result = detect_playback_signal(
+        info=_paused_info(progress_ms=50000, duration_ms=200000),
+        current_track_uri=_SIG_URI,
+        our_state=PlaybackState.PLAYING,
+        in_settle_period=False,
+    )
+    pytest.assume(result == PlaybackSignal.EXTERNAL_PAUSE)
+
+
+def test_signal_playing_and_we_think_playing():
+    result = detect_playback_signal(
+        info=_playing_info(),
+        current_track_uri=_SIG_URI,
+        our_state=PlaybackState.PLAYING,
+        in_settle_period=False,
+    )
+    pytest.assume(result == PlaybackSignal.NOTHING)
+
+
+def test_signal_paused_and_we_think_paused():
+    result = detect_playback_signal(
+        info=_paused_info(progress_ms=50000, duration_ms=200000),
+        current_track_uri=_SIG_URI,
+        our_state=PlaybackState.PAUSED,
+        in_settle_period=False,
+    )
+    pytest.assume(result == PlaybackSignal.NOTHING)

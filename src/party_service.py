@@ -7,7 +7,14 @@ from typing import TYPE_CHECKING
 from spotipy.exceptions import SpotifyException
 
 from adem_mode import AdemMode
-from models import PartyEvent, PartyEventType, PlaybackInfo, PlaybackState, QueueItem
+from models import (
+    PartyEvent,
+    PartyEventType,
+    PlaybackInfo,
+    PlaybackSignal,
+    PlaybackState,
+    QueueItem,
+)
 from persistence import QueueStore
 
 if TYPE_CHECKING:
@@ -17,6 +24,43 @@ logger = logging.getLogger(__name__)
 
 TRACK_END_THRESHOLD_MS = 5000
 PLAYBACK_SETTLE_SECONDS = 5
+
+
+def detect_playback_signal(
+    info: PlaybackInfo | None,
+    current_track_uri: str | None,
+    our_state: PlaybackState,
+    in_settle_period: bool,
+) -> PlaybackSignal:
+    if info is None:
+        if current_track_uri is not None and not in_settle_period:
+            return PlaybackSignal.TRACK_LOST
+        return PlaybackSignal.NOTHING
+
+    is_our_track = (
+        current_track_uri is not None
+        and info.track_uri is not None
+        and info.track_uri == current_track_uri
+    )
+    if not is_our_track:
+        if in_settle_period:
+            return PlaybackSignal.NOTHING
+        return PlaybackSignal.TRACK_LOST
+
+    track_ended = (
+        not info.is_playing
+        and info.duration_ms > 0
+        and (info.duration_ms - info.progress_ms) < TRACK_END_THRESHOLD_MS
+    )
+    if track_ended:
+        return PlaybackSignal.TRACK_ENDED
+
+    if info.is_playing and our_state == PlaybackState.PAUSED:
+        return PlaybackSignal.EXTERNAL_RESUME
+    if not info.is_playing and our_state == PlaybackState.PLAYING:
+        return PlaybackSignal.EXTERNAL_PAUSE
+
+    return PlaybackSignal.NOTHING
 
 
 class PartyService:
@@ -182,12 +226,6 @@ class PartyService:
     def get_devices(self) -> list[dict]:
         return self._spotify.get_devices()
 
-    def _is_our_track(self, info: PlaybackInfo) -> bool:
-        current = self._store.currently_playing
-        if current is None or info.track_uri is None:
-            return False
-        return info.track_uri == current.track_uri
-
     def _in_settle_period(self) -> bool:
         return (
             time.monotonic() - self._playback_commanded_at
@@ -198,41 +236,26 @@ class PartyService:
             return
 
         info = self._spotify.get_playback_state()
-        if info is None:
-            if (
-                self._store.currently_playing is not None
-                and not self._in_settle_period()
-            ):
-                logger.info("Playback stopped externally, advancing queue")
-                self._advance_queue()
-            return
-
-        if not self._is_our_track(info):
-            if self._in_settle_period():
-                return
-            logger.info("Our track no longer on Spotify, advancing queue")
-            self._advance_queue()
-            return
-
-        track_ended = (
-            not info.is_playing
-            and info.duration_ms > 0
-            and (info.duration_ms - info.progress_ms) < TRACK_END_THRESHOLD_MS
+        current = self._store.currently_playing
+        signal = detect_playback_signal(
+            info=info,
+            current_track_uri=current.track_uri if current else None,
+            our_state=self._store.playback_state,
+            in_settle_period=self._in_settle_period(),
         )
 
-        if track_ended:
+        if signal in (PlaybackSignal.TRACK_ENDED, PlaybackSignal.TRACK_LOST):
+            logger.info("Advancing queue (%s)", signal.value)
             self._advance_queue()
             return
 
-        if info.is_playing and self._store.playback_state == PlaybackState.PAUSED:
-            logger.info("Playback resumed externally")
-            self._store.set_playback_state(PlaybackState.PLAYING)
-            self._bump_version()
-        elif (
-            not info.is_playing and self._store.playback_state == PlaybackState.PLAYING
-        ):
+        if signal == PlaybackSignal.EXTERNAL_PAUSE:
             logger.info("Playback paused externally")
             self._store.set_playback_state(PlaybackState.PAUSED)
+            self._bump_version()
+        elif signal == PlaybackSignal.EXTERNAL_RESUME:
+            logger.info("Playback resumed externally")
+            self._store.set_playback_state(PlaybackState.PLAYING)
             self._bump_version()
 
         self._refill_adem_if_needed()

@@ -9,6 +9,14 @@ class PlaybackState(StrEnum):
     PAUSED = "paused"
 
 
+class PlaybackSignal(StrEnum):
+    NOTHING = "nothing"
+    TRACK_ENDED = "track_ended"
+    TRACK_LOST = "track_lost"
+    EXTERNAL_PAUSE = "external_pause"
+    EXTERNAL_RESUME = "external_resume"
+
+
 class PartyEventType(StrEnum):
     ADDED = "added"
     SKIPPED = "skipped"
