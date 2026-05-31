@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from spotipy.exceptions import SpotifyException
 
+from adem_mode import AdemMode
 from models import PartyEvent, PartyEventType, PlaybackInfo, PlaybackState, QueueItem
 from persistence import QueueStore
 
@@ -17,15 +18,6 @@ logger = logging.getLogger(__name__)
 TRACK_END_THRESHOLD_MS = 5000
 PLAYBACK_SETTLE_SECONDS = 5
 
-ADEM_SONG = QueueItem(
-    track_name="Ademnood",
-    artist="Linda Roos & Jessica",
-    album_art_url="https://i.scdn.co/image/ab67616d0000b273eadf932fba8bf38eba3947a1",
-    track_uri="spotify:track:5ljuGR6Fv7B2mviKflDoE4",
-    requester="🦫",
-)
-ADEM_QUEUE_SIZE = 50
-
 
 class PartyService:
     MAX_EVENTS = 50
@@ -33,6 +25,7 @@ class PartyService:
     def __init__(self, spotify: SpotifyClient, store: QueueStore):
         self._spotify = spotify
         self._store = store
+        self._adem = AdemMode(store)
         self._version: int = 0
         self._events: list[PartyEvent] = []
         self._beaver_enabled: bool = False
@@ -86,7 +79,7 @@ class PartyService:
 
     @property
     def adem_mode_active(self) -> bool:
-        return self._store.adem_mode_active
+        return self._adem.active
 
     def is_authenticated(self) -> bool:
         return self._spotify.is_authenticated()
@@ -107,30 +100,20 @@ class PartyService:
     def start_session(self, name: str, device_id: str, adem_mode: bool = False) -> None:
         self._store.start_session(name, device_id)
         if adem_mode:
-            self.fill_adem_queue()
+            self._adem.activate()
         self._bump_version()
-
-    def fill_adem_queue(self) -> None:
-        for _ in range(ADEM_QUEUE_SIZE):
-            self._store.add_to_queue(ADEM_SONG)
-        self._store.set_adem_mode_active(True)
 
     def fill_benchmark_queue(self, items: list[QueueItem]) -> None:
         self._store.clear_queue()
         for item in items:
             self._store.add_to_queue(item)
-        self._store.set_adem_mode_active(True)
         self._bump_version()
 
     def search_songs(self, query: str) -> list[QueueItem]:
         return self._spotify.search_tracks(query)
 
     def add_to_queue(self, item: QueueItem, top: bool = False) -> None:
-        if self._store.adem_mode_active and any(
-            q.track_uri == ADEM_SONG.track_uri and q.requester == ADEM_SONG.requester
-            for q in self._store.queue
-        ):
-            self._store.clear_queue()
+        self._adem.on_user_add()
         self._store.add_to_queue(item, top=top)
         self._bump_version()
         self._emit(PartyEventType.ADDED, item.track_uri, is_priority=top)
@@ -255,8 +238,7 @@ class PartyService:
         self._refill_adem_if_needed()
 
     def _refill_adem_if_needed(self) -> None:
-        if self._store.adem_mode_active and not self._store.queue:
-            self.fill_adem_queue()
+        if self._adem.refill_if_needed():
             self._bump_version()
 
     def _advance_queue(self) -> None:

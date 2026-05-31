@@ -5,7 +5,8 @@ import pytest
 from spotipy.exceptions import SpotifyException
 
 from models import PartyEventType, PlaybackInfo, PlaybackState, QueueItem
-from party_service import ADEM_QUEUE_SIZE, ADEM_SONG, PartyService
+from adem_mode import ADEM_MODE_QUEUE_SIZE, ADEMNOOD_ITEM
+from party_service import PartyService
 from persistence import QueueStore
 
 
@@ -592,21 +593,21 @@ def test_poll_different_track_uri_advances_queue(service, mock_spotify):
 
 def test_start_session_with_adem_mode(service):
     service.start_session("Party", "dev1", adem_mode=True)
-    pytest.assume(len(service.get_queue()) == ADEM_QUEUE_SIZE)
+    pytest.assume(len(service.get_queue()) == ADEM_MODE_QUEUE_SIZE)
     pytest.assume(service.adem_mode_active is True)
-    pytest.assume(service.get_queue()[0].track_name == ADEM_SONG.track_name)
+    pytest.assume(service.get_queue()[0].track_name == ADEMNOOD_ITEM.track_name)
     pytest.assume(service.get_queue()[0].requester == "🦫")
 
 
 def test_adem_queue_all_unique_uids(service):
     service.start_session("Party", "dev1", adem_mode=True)
     uids = [item.uid for item in service.get_queue()]
-    pytest.assume(len(set(uids)) == ADEM_QUEUE_SIZE)
+    pytest.assume(len(set(uids)) == ADEM_MODE_QUEUE_SIZE)
 
 
 def test_add_clears_adem_songs_but_keeps_mode(service):
     service.start_session("Party", "dev1", adem_mode=True)
-    pytest.assume(len(service.get_queue()) == ADEM_QUEUE_SIZE)
+    pytest.assume(len(service.get_queue()) == ADEM_MODE_QUEUE_SIZE)
 
     service.add_to_queue(
         _make_item("Real Song", uri="spotify:track:real", requester="Alice")
@@ -640,8 +641,10 @@ def test_adem_refills_after_real_songs_drain(service, mock_spotify):
     service.poll_playback()
 
     pytest.assume(service.adem_mode_active is True)
-    pytest.assume(len(service.get_queue()) == ADEM_QUEUE_SIZE - 1)
-    pytest.assume(service.get_currently_playing().track_name == ADEM_SONG.track_name)
+    pytest.assume(len(service.get_queue()) == ADEM_MODE_QUEUE_SIZE - 1)
+    pytest.assume(
+        service.get_currently_playing().track_name == ADEMNOOD_ITEM.track_name
+    )
 
 
 def test_adem_queue_persists_across_restart(mock_spotify, tmp_path):
@@ -652,7 +655,7 @@ def test_adem_queue_persists_across_restart(mock_spotify, tmp_path):
     store2 = QueueStore(tmp_path / "session.json")
     svc2 = PartyService(spotify=mock_spotify, store=store2)
     pytest.assume(svc2.adem_mode_active is True)
-    pytest.assume(len(svc2.get_queue()) == ADEM_QUEUE_SIZE)
+    pytest.assume(len(svc2.get_queue()) == ADEM_MODE_QUEUE_SIZE)
 
 
 def test_start_session_without_adem_mode(service):
@@ -666,7 +669,7 @@ def test_adem_mode_refills_queue_while_playing(service, mock_spotify):
     service.play_next()
     pytest.assume(service.get_currently_playing() is not None)
 
-    for _ in range(ADEM_QUEUE_SIZE - 1):
+    for _ in range(ADEM_MODE_QUEUE_SIZE - 1):
         service.play_next()
 
     mock_spotify.get_playback_state.return_value = PlaybackInfo(
@@ -677,7 +680,7 @@ def test_adem_mode_refills_queue_while_playing(service, mock_spotify):
     )
     service.poll_playback()
 
-    pytest.assume(len(service.get_queue()) == ADEM_QUEUE_SIZE)
+    pytest.assume(len(service.get_queue()) == ADEM_MODE_QUEUE_SIZE)
     pytest.assume(service.adem_mode_active is True)
 
 
@@ -685,15 +688,17 @@ def test_adem_mode_refills_on_advance_when_empty(service, mock_spotify):
     service.start_session("Party", "dev1", adem_mode=True)
     service.play_next()
 
-    for _ in range(ADEM_QUEUE_SIZE - 1):
+    for _ in range(ADEM_MODE_QUEUE_SIZE - 1):
         service.play_next()
 
     service._playback_commanded_at = 0
     mock_spotify.get_playback_state.return_value = None
     service.poll_playback()
 
-    pytest.assume(len(service.get_queue()) == ADEM_QUEUE_SIZE - 1)
-    pytest.assume(service.get_currently_playing().track_name == ADEM_SONG.track_name)
+    pytest.assume(len(service.get_queue()) == ADEM_MODE_QUEUE_SIZE - 1)
+    pytest.assume(
+        service.get_currently_playing().track_name == ADEMNOOD_ITEM.track_name
+    )
     pytest.assume(service.adem_mode_active is True)
 
 
