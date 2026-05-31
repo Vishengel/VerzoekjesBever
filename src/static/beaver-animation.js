@@ -13,7 +13,11 @@ function triggerBeaverAnimation() {
 
     const beaver = document.createElement('span');
     beaver.className = 'beaver-actor';
-    beaver.textContent = '🦫';
+    const img = document.createElement('img');
+    img.src = '/static/beaver.svg';
+    img.style.width = '80px';
+    img.style.height = '80px';
+    beaver.appendChild(img);
     overlay.appendChild(beaver);
 
     if (pick === 'beaver-bat') {
@@ -67,13 +71,18 @@ function triggerBeaverAddAnimation(isPriority) {
     var beaver = document.createElement('span');
     beaver.className = 'beaver-actor';
     beaver.style.animation = keyframes[pick].beaver + ' ' + duration + 's ease-in-out forwards';
-    var beaverEmoji = document.createElement('span');
+    var beaverEmoji = document.createElement('img');
     beaverEmoji.className = 'beaver-emoji';
-    beaverEmoji.textContent = '🦫';
+    beaverEmoji.src = '/static/beaver.svg';
+    beaverEmoji.style.width = '80px';
+    beaverEmoji.style.height = '80px';
     beaver.appendChild(beaverEmoji);
     if (isPriority) {
         var accessory = document.createElement('span');
         accessory.className = 'beaver-accessory';
+        if (Math.random() >= 0.1) {
+            accessory.style.top = '-23px';
+        }
         accessory.textContent = '👑';
         beaver.appendChild(accessory);
     }

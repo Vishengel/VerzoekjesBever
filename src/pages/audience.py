@@ -41,7 +41,7 @@ def audience_page():
 
     with ui.column().classes("w-full max-w-3xl mx-auto p-8 gap-6"):
         with ui.column().classes("items-center gap-1"):
-            ui.label("🦫").classes("text-5xl")
+            ui.image("/static/beaver.svg").classes("w-12 h-12")
             ui.label("VERZOEKJESBEVER").classes(
                 "text-2xl font-extrabold tracking-wide text-white"
             )
@@ -49,7 +49,7 @@ def audience_page():
 
         if not svc.has_session:
             with ui.card().classes("w-full bg-gray-800 rounded-xl p-8 text-center"):
-                ui.label("🦫").classes("text-4xl")
+                ui.image("/static/beaver.svg").classes("w-10 h-10 mx-auto")
                 ui.label("Waiting for DJ to start the party").classes(
                     "text-xl text-gray-400 mt-2"
                 )
@@ -89,7 +89,7 @@ def audience_page():
                                     ).classes("text-sm text-white/60 mt-1")
             else:
                 with ui.card().classes("w-full bg-gray-800 rounded-xl p-8 text-center"):
-                    ui.label("🦫").classes("text-4xl")
+                    ui.image("/static/beaver.svg").classes("w-10 h-10 mx-auto")
                     ui.label("No song playing yet").classes(
                         "text-xl text-gray-400 mt-2"
                     )

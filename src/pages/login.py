@@ -25,7 +25,7 @@ def login_page():
             ui.notify("Wrong password", type="negative")
 
     with ui.column().classes("w-full max-w-sm mx-auto mt-32 gap-6 items-center"):
-        ui.label("🦫").classes("text-6xl")
+        ui.image("/static/beaver.svg").classes("w-16 h-16")
         ui.label("VerzoekjesBever").classes("text-3xl font-bold")
         ui.label("Enter DJ password").classes("text-gray-400")
 

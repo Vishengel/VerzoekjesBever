@@ -14,7 +14,7 @@ def setup_page():
     svc = get_service()
 
     with ui.column().classes("w-full max-w-lg mx-auto mt-16 gap-6"):
-        ui.label("🦫").classes("text-6xl text-center w-full")
+        ui.image("/static/beaver.svg").classes("w-16 h-16 mx-auto")
         ui.label("VerzoekjesBever").classes("text-3xl font-bold text-center w-full")
         ui.label("Setup your party").classes("text-gray-400 text-center w-full")
 
