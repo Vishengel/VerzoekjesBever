@@ -5,7 +5,7 @@ import pytest
 from spotipy.exceptions import SpotifyException
 
 from models import PartyEventType, PlaybackInfo, PlaybackState, QueueItem
-from party_service import DEMO_QUEUE_SIZE, DEMO_SONG, PartyService
+from party_service import ADEM_QUEUE_SIZE, ADEM_SONG, PartyService
 from persistence import QueueStore
 
 
@@ -402,6 +402,41 @@ def test_session_persists_across_restart(service, mock_spotify, tmp_path):
     pytest.assume(svc2.get_queue()[0].track_name == "Song1")
 
 
+# --- Settle period (Spotify API latency guard) ---
+
+
+def test_poll_ignores_none_during_settle_period(service, mock_spotify):
+    """Spotify API hasn't registered new track yet → don't advance."""
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
+    service.play_next()
+
+    mock_spotify.get_playback_state.return_value = None
+    service.poll_playback()
+
+    pytest.assume(service.get_currently_playing().track_name == "Song1")
+    pytest.assume(service.playback_state == PlaybackState.PLAYING)
+
+
+def test_poll_ignores_wrong_track_during_settle_period(service, mock_spotify):
+    """Spotify still reports old track during settle → don't advance."""
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
+    service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="Mark"))
+    service.play_next()
+
+    mock_spotify.get_playback_state.return_value = PlaybackInfo(
+        is_playing=True,
+        progress_ms=5000,
+        duration_ms=180000,
+        track_uri="spotify:track:old",
+    )
+    service.poll_playback()
+
+    pytest.assume(service.get_currently_playing().track_name == "Song1")
+    pytest.assume(len(service.get_queue()) == 1)
+
+
 # --- Playback desync bug fixes ---
 
 
@@ -412,6 +447,7 @@ def test_poll_state_none_advances_queue(service, mock_spotify):
     service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="Mark"))
     service.play_next()
 
+    service._playback_commanded_at = 0
     mock_spotify.get_playback_state.return_value = None
     service.poll_playback()
 
@@ -426,6 +462,7 @@ def test_poll_state_none_empty_queue_goes_idle(service, mock_spotify):
     service.add_to_queue(_make_item(requester="Lisa"))
     service.play_next()
 
+    service._playback_commanded_at = 0
     mock_spotify.get_playback_state.return_value = None
     service.poll_playback()
 
@@ -440,6 +477,7 @@ def test_poll_state_none_play_fails_requeues(service, mock_spotify):
     service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="Mark"))
     service.play_next()
 
+    service._playback_commanded_at = 0
     mock_spotify.get_playback_state.return_value = None
     mock_spotify.play_track.side_effect = SpotifyException(
         404, "https://api.spotify.com", msg="Device not found"
@@ -519,6 +557,7 @@ def test_poll_track_uri_gone_advances_queue(service, mock_spotify):
     service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="Mark"))
     service.play_next()
 
+    service._playback_commanded_at = 0
     mock_spotify.get_playback_state.return_value = PlaybackInfo(
         is_playing=False, progress_ms=0, duration_ms=0, track_uri=None
     )
@@ -535,6 +574,7 @@ def test_poll_different_track_uri_advances_queue(service, mock_spotify):
     service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="Mark"))
     service.play_next()
 
+    service._playback_commanded_at = 0
     mock_spotify.get_playback_state.return_value = PlaybackInfo(
         is_playing=True,
         progress_ms=5000,
@@ -547,57 +587,93 @@ def test_poll_different_track_uri_advances_queue(service, mock_spotify):
     pytest.assume(service.get_currently_playing().track_name == "Song2")
 
 
-# --- Demo queue ---
+# --- Adem-mode ---
 
 
-def test_start_session_with_demo(service):
-    service.start_session("Party", "dev1", demo=True)
-    pytest.assume(len(service.get_queue()) == DEMO_QUEUE_SIZE)
-    pytest.assume(service.demo_queue_active is True)
-    pytest.assume(service.get_queue()[0].track_name == DEMO_SONG.track_name)
+def test_start_session_with_adem_mode(service):
+    service.start_session("Party", "dev1", adem_mode=True)
+    pytest.assume(len(service.get_queue()) == ADEM_QUEUE_SIZE)
+    pytest.assume(service.adem_mode_active is True)
+    pytest.assume(service.get_queue()[0].track_name == ADEM_SONG.track_name)
     pytest.assume(service.get_queue()[0].requester == "🦫")
 
 
-def test_demo_queue_all_unique_uids(service):
-    service.start_session("Party", "dev1", demo=True)
+def test_adem_queue_all_unique_uids(service):
+    service.start_session("Party", "dev1", adem_mode=True)
     uids = [item.uid for item in service.get_queue()]
-    pytest.assume(len(set(uids)) == DEMO_QUEUE_SIZE)
+    pytest.assume(len(set(uids)) == ADEM_QUEUE_SIZE)
 
 
-def test_demo_queue_cleared_on_first_add(service):
-    service.start_session("Party", "dev1", demo=True)
-    pytest.assume(len(service.get_queue()) == DEMO_QUEUE_SIZE)
+def test_adem_queue_cleared_on_first_add(service):
+    service.start_session("Party", "dev1", adem_mode=True)
+    pytest.assume(len(service.get_queue()) == ADEM_QUEUE_SIZE)
 
     real_song = _make_item("Real Song", uri="spotify:track:real", requester="Alice")
     service.add_to_queue(real_song)
 
     pytest.assume(len(service.get_queue()) == 1)
     pytest.assume(service.get_queue()[0].track_name == "Real Song")
-    pytest.assume(service.demo_queue_active is False)
+    pytest.assume(service.adem_mode_active is False)
 
 
-def test_demo_queue_second_add_normal(service):
-    service.start_session("Party", "dev1", demo=True)
+def test_adem_queue_second_add_normal(service):
+    service.start_session("Party", "dev1", adem_mode=True)
     service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="A"))
     service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="B"))
     pytest.assume(len(service.get_queue()) == 2)
 
 
-def test_demo_queue_persists_across_restart(mock_spotify, tmp_path):
+def test_adem_queue_persists_across_restart(mock_spotify, tmp_path):
     store1 = QueueStore(tmp_path / "session.json")
     svc1 = PartyService(spotify=mock_spotify, store=store1)
-    svc1.start_session("Party", "dev1", demo=True)
+    svc1.start_session("Party", "dev1", adem_mode=True)
 
     store2 = QueueStore(tmp_path / "session.json")
     svc2 = PartyService(spotify=mock_spotify, store=store2)
-    pytest.assume(svc2.demo_queue_active is True)
-    pytest.assume(len(svc2.get_queue()) == DEMO_QUEUE_SIZE)
+    pytest.assume(svc2.adem_mode_active is True)
+    pytest.assume(len(svc2.get_queue()) == ADEM_QUEUE_SIZE)
 
 
-def test_start_session_without_demo(service):
-    service.start_session("Party", "dev1", demo=False)
+def test_start_session_without_adem_mode(service):
+    service.start_session("Party", "dev1", adem_mode=False)
     pytest.assume(len(service.get_queue()) == 0)
-    pytest.assume(service.demo_queue_active is False)
+    pytest.assume(service.adem_mode_active is False)
+
+
+def test_adem_mode_refills_queue_while_playing(service, mock_spotify):
+    service.start_session("Party", "dev1", adem_mode=True)
+    service.play_next()
+    pytest.assume(service.get_currently_playing() is not None)
+
+    for _ in range(ADEM_QUEUE_SIZE - 1):
+        service.play_next()
+
+    mock_spotify.get_playback_state.return_value = PlaybackInfo(
+        is_playing=True,
+        progress_ms=10000,
+        duration_ms=200000,
+        track_uri=service.get_currently_playing().track_uri,
+    )
+    service.poll_playback()
+
+    pytest.assume(len(service.get_queue()) == ADEM_QUEUE_SIZE)
+    pytest.assume(service.adem_mode_active is True)
+
+
+def test_adem_mode_refills_on_advance_when_empty(service, mock_spotify):
+    service.start_session("Party", "dev1", adem_mode=True)
+    service.play_next()
+
+    for _ in range(ADEM_QUEUE_SIZE - 1):
+        service.play_next()
+
+    service._playback_commanded_at = 0
+    mock_spotify.get_playback_state.return_value = None
+    service.poll_playback()
+
+    pytest.assume(len(service.get_queue()) == ADEM_QUEUE_SIZE - 1)
+    pytest.assume(service.get_currently_playing().track_name == ADEM_SONG.track_name)
+    pytest.assume(service.adem_mode_active is True)
 
 
 def test_is_authenticated(service, mock_spotify):

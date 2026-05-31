@@ -304,26 +304,26 @@ def test_atomic_write_produces_valid_file(tmp_path: Path):
     pytest.assume(not tmp_file.exists())
 
 
-def test_demo_queue_active_default_false(tmp_path: Path):
+def test_adem_mode_active_default_false(tmp_path: Path):
     store = QueueStore(tmp_path / "session.json")
-    pytest.assume(store.demo_queue_active is False)
+    pytest.assume(store.adem_mode_active is False)
 
 
-def test_demo_queue_active_persists(tmp_path: Path):
+def test_adem_mode_active_persists(tmp_path: Path):
     path = tmp_path / "session.json"
     store1 = QueueStore(path)
     store1.start_session("Party", "dev1")
-    store1.set_demo_queue_active(True)
+    store1.set_adem_mode_active(True)
 
     store2 = QueueStore(path)
-    pytest.assume(store2.demo_queue_active is True)
+    pytest.assume(store2.adem_mode_active is True)
 
 
-def test_start_session_resets_demo_queue(tmp_path: Path):
+def test_start_session_resets_adem_mode(tmp_path: Path):
     store = QueueStore(tmp_path / "session.json")
-    store.set_demo_queue_active(True)
+    store.set_adem_mode_active(True)
     store.start_session("Party", "dev1")
-    pytest.assume(store.demo_queue_active is False)
+    pytest.assume(store.adem_mode_active is False)
 
 
 def test_duplicate_track_uri_unique_uids(tmp_path: Path):

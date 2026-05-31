@@ -17,7 +17,7 @@ class QueueStore:
         self._playback_state: PlaybackState = PlaybackState.IDLE
         self._currently_playing: QueueItem | None = None
         self._queue: list[QueueItem] = []
-        self._demo_queue_active: bool = False
+        self._adem_mode_active: bool = False
         self._load()
 
     @property
@@ -45,8 +45,8 @@ class QueueStore:
         return list(self._queue)
 
     @property
-    def demo_queue_active(self) -> bool:
-        return self._demo_queue_active
+    def adem_mode_active(self) -> bool:
+        return self._adem_mode_active
 
     def start_session(self, name: str, device_id: str) -> None:
         self._session_name = name
@@ -54,7 +54,7 @@ class QueueStore:
         self._playback_state = PlaybackState.IDLE
         self._currently_playing = None
         self._queue = []
-        self._demo_queue_active = False
+        self._adem_mode_active = False
         self._save()
 
     def add_to_queue(self, item: QueueItem, top: bool = False) -> None:
@@ -135,8 +135,8 @@ class QueueStore:
                 names.add(item.requester)
         return sorted(names)
 
-    def set_demo_queue_active(self, active: bool) -> None:
-        self._demo_queue_active = active
+    def set_adem_mode_active(self, active: bool) -> None:
+        self._adem_mode_active = active
         self._save()
 
     def set_device(self, device_id: str) -> None:
@@ -157,7 +157,7 @@ class QueueStore:
         cp = data.get("currently_playing")
         self._currently_playing = QueueItem.from_dict(cp) if cp else None
         self._queue = [QueueItem.from_dict(q) for q in data.get("queue", [])]
-        self._demo_queue_active = data.get("demo_queue_active", False)
+        self._adem_mode_active = data.get("adem_mode_active", False)
 
     def _save(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -169,7 +169,7 @@ class QueueStore:
             if self._currently_playing
             else None,
             "queue": [q.to_dict() for q in self._queue],
-            "demo_queue_active": self._demo_queue_active,
+            "adem_mode_active": self._adem_mode_active,
         }
         tmp = self._path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=2))

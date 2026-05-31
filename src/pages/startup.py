@@ -81,14 +81,14 @@ def setup_page():
 
         ui.button("Refresh devices", on_click=refresh_devices).props("flat color=grey")
 
-        demo_toggle = ui.checkbox("Pre-fill queue with 50 demo songs").classes("w-full")
+        adem_toggle = ui.checkbox("Adem-mode").classes("w-full")
 
         def start_new():
             if not device_select.value:
                 ui.notify("Select a device first", type="warning")
                 return
             svc.start_session(
-                session_name.value, device_select.value, demo=demo_toggle.value
+                session_name.value, device_select.value, adem_mode=adem_toggle.value
             )
             ui.navigate.to("/dj")
 

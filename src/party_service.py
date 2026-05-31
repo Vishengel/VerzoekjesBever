@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING
 
 from spotipy.exceptions import SpotifyException
@@ -14,15 +15,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 TRACK_END_THRESHOLD_MS = 5000
+PLAYBACK_SETTLE_SECONDS = 5
 
-DEMO_SONG = QueueItem(
+ADEM_SONG = QueueItem(
     track_name="Ademnood",
     artist="Linda Roos & Jessica",
     album_art_url="https://i.scdn.co/image/ab67616d0000b273eadf932fba8bf38eba3947a1",
     track_uri="spotify:track:5ljuGR6Fv7B2mviKflDoE4",
     requester="🦫",
 )
-DEMO_QUEUE_SIZE = 50
+ADEM_QUEUE_SIZE = 50
 
 
 class PartyService:
@@ -35,6 +37,7 @@ class PartyService:
         self._events: list[PartyEvent] = []
         self._beaver_enabled: bool = False
         self._show_qr_code: bool = False
+        self._playback_commanded_at: float = 0.0
 
     @property
     def version(self) -> int:
@@ -82,8 +85,8 @@ class PartyService:
         return self._show_qr_code
 
     @property
-    def demo_queue_active(self) -> bool:
-        return self._store.demo_queue_active
+    def adem_mode_active(self) -> bool:
+        return self._store.adem_mode_active
 
     def is_authenticated(self) -> bool:
         return self._spotify.is_authenticated()
@@ -101,30 +104,30 @@ class PartyService:
         self._show_qr_code = enabled
         self._bump_version()
 
-    def start_session(self, name: str, device_id: str, demo: bool = False) -> None:
+    def start_session(self, name: str, device_id: str, adem_mode: bool = False) -> None:
         self._store.start_session(name, device_id)
-        if demo:
-            self.fill_demo_queue()
+        if adem_mode:
+            self.fill_adem_queue()
         self._bump_version()
 
-    def fill_demo_queue(self) -> None:
-        for _ in range(DEMO_QUEUE_SIZE):
-            self._store.add_to_queue(DEMO_SONG)
-        self._store.set_demo_queue_active(True)
+    def fill_adem_queue(self) -> None:
+        for _ in range(ADEM_QUEUE_SIZE):
+            self._store.add_to_queue(ADEM_SONG)
+        self._store.set_adem_mode_active(True)
 
     def fill_benchmark_queue(self, items: list[QueueItem]) -> None:
         self._store.clear_queue()
         for item in items:
             self._store.add_to_queue(item)
-        self._store.set_demo_queue_active(True)
+        self._store.set_adem_mode_active(True)
         self._bump_version()
 
     def search_songs(self, query: str) -> list[QueueItem]:
         return self._spotify.search_tracks(query)
 
     def add_to_queue(self, item: QueueItem, top: bool = False) -> None:
-        if self._store.demo_queue_active:
-            self._store.set_demo_queue_active(False)
+        if self._store.adem_mode_active:
+            self._store.set_adem_mode_active(False)
             self._store.clear_queue()
         self._store.add_to_queue(item, top=top)
         self._bump_version()
@@ -160,10 +163,12 @@ class PartyService:
         return self._store.currently_playing
 
     def play_next(self) -> None:
+        self._refill_adem_if_needed()
         item = self._store.pop_next()
         if item is None:
             return
         self._spotify.play_track(item.track_uri, device_id=self._store.device_id)
+        self._playback_commanded_at = time.monotonic()
         self._store.set_currently_playing(item, PlaybackState.PLAYING)
         self._bump_version()
         self._emit(PartyEventType.SKIPPED, item.track_uri)
@@ -198,18 +203,28 @@ class PartyService:
             return False
         return info.track_uri == current.track_uri
 
+    def _in_settle_period(self) -> bool:
+        return (
+            time.monotonic() - self._playback_commanded_at
+        ) < PLAYBACK_SETTLE_SECONDS
+
     def poll_playback(self) -> None:
         if self._store.playback_state == PlaybackState.IDLE:
             return
 
         info = self._spotify.get_playback_state()
         if info is None:
-            if self._store.currently_playing is not None:
+            if (
+                self._store.currently_playing is not None
+                and not self._in_settle_period()
+            ):
                 logger.info("Playback stopped externally, advancing queue")
                 self._advance_queue()
             return
 
         if not self._is_our_track(info):
+            if self._in_settle_period():
+                return
             logger.info("Our track no longer on Spotify, advancing queue")
             self._advance_queue()
             return
@@ -235,13 +250,22 @@ class PartyService:
             self._store.set_playback_state(PlaybackState.PAUSED)
             self._bump_version()
 
+        self._refill_adem_if_needed()
+
+    def _refill_adem_if_needed(self) -> None:
+        if self._store.adem_mode_active and not self._store.queue:
+            self.fill_adem_queue()
+            self._bump_version()
+
     def _advance_queue(self) -> None:
+        self._refill_adem_if_needed()
         next_item = self._store.pop_next()
         if next_item:
             try:
                 self._spotify.play_track(
                     next_item.track_uri, device_id=self._store.device_id
                 )
+                self._playback_commanded_at = time.monotonic()
                 self._store.set_currently_playing(next_item, PlaybackState.PLAYING)
             except SpotifyException:
                 logger.warning("Failed to start next track, re-queuing")
