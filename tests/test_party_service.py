@@ -604,23 +604,44 @@ def test_adem_queue_all_unique_uids(service):
     pytest.assume(len(set(uids)) == ADEM_QUEUE_SIZE)
 
 
-def test_adem_queue_cleared_on_first_add(service):
+def test_add_clears_adem_songs_but_keeps_mode(service):
     service.start_session("Party", "dev1", adem_mode=True)
     pytest.assume(len(service.get_queue()) == ADEM_QUEUE_SIZE)
 
-    real_song = _make_item("Real Song", uri="spotify:track:real", requester="Alice")
-    service.add_to_queue(real_song)
+    service.add_to_queue(
+        _make_item("Real Song", uri="spotify:track:real", requester="Alice")
+    )
 
     pytest.assume(len(service.get_queue()) == 1)
     pytest.assume(service.get_queue()[0].track_name == "Real Song")
-    pytest.assume(service.adem_mode_active is False)
+    pytest.assume(service.adem_mode_active is True)
 
 
-def test_adem_queue_second_add_normal(service):
+def test_second_add_keeps_first_song(service):
     service.start_session("Party", "dev1", adem_mode=True)
-    service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="A"))
-    service.add_to_queue(_make_item("Song2", uri="spotify:track:s2", requester="B"))
+    service.add_to_queue(_make_item("Song A", uri="spotify:track:a", requester="Alice"))
+    service.add_to_queue(_make_item("Song B", uri="spotify:track:b", requester="Bob"))
+
     pytest.assume(len(service.get_queue()) == 2)
+    pytest.assume(service.get_queue()[0].track_name == "Song A")
+    pytest.assume(service.get_queue()[1].track_name == "Song B")
+    pytest.assume(service.adem_mode_active is True)
+
+
+def test_adem_refills_after_real_songs_drain(service, mock_spotify):
+    service.start_session("Party", "dev1", adem_mode=True)
+    service.add_to_queue(
+        _make_item("Real Song", uri="spotify:track:real", requester="Alice")
+    )
+    service.play_next()
+
+    mock_spotify.get_playback_state.return_value = None
+    service._playback_commanded_at = 0
+    service.poll_playback()
+
+    pytest.assume(service.adem_mode_active is True)
+    pytest.assume(len(service.get_queue()) == ADEM_QUEUE_SIZE - 1)
+    pytest.assume(service.get_currently_playing().track_name == ADEM_SONG.track_name)
 
 
 def test_adem_queue_persists_across_restart(mock_spotify, tmp_path):

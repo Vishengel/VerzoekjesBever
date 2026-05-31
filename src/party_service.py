@@ -126,8 +126,10 @@ class PartyService:
         return self._spotify.search_tracks(query)
 
     def add_to_queue(self, item: QueueItem, top: bool = False) -> None:
-        if self._store.adem_mode_active:
-            self._store.set_adem_mode_active(False)
+        if self._store.adem_mode_active and any(
+            q.track_uri == ADEM_SONG.track_uri and q.requester == ADEM_SONG.requester
+            for q in self._store.queue
+        ):
             self._store.clear_queue()
         self._store.add_to_queue(item, top=top)
         self._bump_version()

@@ -157,7 +157,9 @@ class QueueStore:
         cp = data.get("currently_playing")
         self._currently_playing = QueueItem.from_dict(cp) if cp else None
         self._queue = [QueueItem.from_dict(q) for q in data.get("queue", [])]
-        self._adem_mode_active = data.get("adem_mode_active", False)
+        self._adem_mode_active = data.get(
+            "adem_mode_active", data.get("demo_queue_active", False)
+        )
 
     def _save(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
