@@ -88,14 +88,7 @@ DJ_PASSWORD=your-dj-password
 Run the container:
 
 ```sh
-docker run -d \
-  -p 8000:8000 \
-  --env-file .env \
-  -v ./data:/app/data \
-  -v ./cache:/app/cache \
-  --restart unless-stopped \
-  --name verzoekjesbever \
-  ghcr.io/vishengel/verzoekjesbever:latest
+docker run -d -p 8000:8000 --env-file .env -v ./data:/app/data -v ./cache:/app/cache --restart unless-stopped --name verzoekjesbever ghcr.io/vishengel/verzoekjesbever:latest
 ```
 
 ### Run with Docker Compose (pre-built image)
