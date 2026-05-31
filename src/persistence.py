@@ -117,14 +117,16 @@ class QueueStore:
 
     def update_requester(self, uid: str, requester: str) -> None:
         if self._currently_playing and self._currently_playing.uid == uid:
-            self._currently_playing.requester = requester
+            self._currently_playing = replace(
+                self._currently_playing, requester=requester
+            )
             self._save()
             return
-        for item in self._queue:
-            if item.uid == uid:
-                item.requester = requester
-                self._save()
-                return
+        self._queue = [
+            replace(item, requester=requester) if item.uid == uid else item
+            for item in self._queue
+        ]
+        self._save()
 
     def get_known_requesters(self) -> list[str]:
         names: set[str] = set()

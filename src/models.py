@@ -31,7 +31,7 @@ class PlaybackInfo:
     track_uri: str | None = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class QueueItem:
     track_name: str
     artist: str
