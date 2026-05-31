@@ -46,6 +46,7 @@ class QueueItem:
     album_art_url: str
     requester: str
     track_uri: str
+    duration_ms: int = 0
     uid: str = field(default_factory=lambda: uuid4().hex[:8])
 
     def to_dict(self) -> dict:
@@ -59,6 +60,7 @@ class QueueItem:
             album_art_url=data["album_art_url"],
             track_uri=data["track_uri"],
             requester=data["requester"],
+            duration_ms=data.get("duration_ms", 0),
             uid=data.get("uid", uuid4().hex[:8]),
         )
 
@@ -71,4 +73,14 @@ class QueueItem:
             album_art_url=images[0]["url"] if images else "",
             requester=requester,
             track_uri=track["uri"],
+            duration_ms=track.get("duration_ms", 0),
         )
+
+
+def format_queue_duration(total_ms: int) -> str:
+    total_seconds = total_ms // 1000
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours:
+        return f"{hours}h {minutes}m"
+    return f"{minutes}m {seconds}s"

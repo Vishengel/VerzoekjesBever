@@ -4,7 +4,7 @@ from nicegui import app, ui
 
 from config import CONFIG
 from deps import get_service
-from models import PlaybackState, QueueItem
+from models import PlaybackState, QueueItem, format_queue_duration
 from party_service import PartyService
 
 
@@ -250,7 +250,17 @@ class DJPage:
 
         queue = self.svc.get_queue()
         with ui.row().classes("w-full items-center justify-between mt-2"):
-            ui.label("UP NEXT").classes("text-xs text-gray-400 tracking-widest")
+            with ui.row().classes("items-center gap-3"):
+                ui.label("UP NEXT").classes("text-xs text-gray-400 tracking-widest")
+                if queue:
+                    total_ms = sum(item.duration_ms for item in queue)
+                    stats = f"⏱ {len(queue)} songs"
+                    if total_ms:
+                        stats += f" · {format_queue_duration(total_ms)} remaining"
+                    ui.label(stats).classes(
+                        "text-sm font-medium text-green-400/80 "
+                        "bg-green-900/30 rounded-full px-3 py-0.5"
+                    )
             if queue:
                 ui.button("Clear queue", on_click=self._confirm_clear_queue).props(
                     "flat dense color=negative size=sm"

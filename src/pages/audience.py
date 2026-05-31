@@ -7,7 +7,7 @@ import segno
 from nicegui import ui
 
 from deps import get_service
-from models import PartyEventType
+from models import PartyEventType, format_queue_duration
 
 
 def _get_local_ip() -> str:
@@ -97,9 +97,18 @@ def audience_page():
 
             queue = svc.get_queue()
             if queue:
-                ui.label("UP NEXT").classes(
-                    "text-sm font-bold tracking-[0.2em] text-green-400/70 mt-4"
-                )
+                with ui.row().classes("items-center justify-between mt-4 w-full"):
+                    ui.label("UP NEXT").classes(
+                        "text-sm font-bold tracking-[0.2em] text-green-400/70"
+                    )
+                    total_ms = sum(item.duration_ms for item in queue)
+                    stats = f"⏱ {len(queue)} songs"
+                    if total_ms:
+                        stats += f" · {format_queue_duration(total_ms)} remaining"
+                    ui.label(stats).classes(
+                        "text-base font-semibold text-green-300/80 "
+                        "bg-white/5 rounded-full px-4 py-1"
+                    )
                 with ui.card().classes("w-full bg-white/5 rounded-xl p-1"):
                     for i, item in enumerate(queue):
                         border = "border-b border-white/5" if i < len(queue) - 1 else ""
