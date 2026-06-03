@@ -58,7 +58,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 ```sh
 uv sync
-uv run python src/main.py
+`uv run python src/main.py`
 ```
 
 The app runs at [http://localhost:8000](http://localhost:8000).

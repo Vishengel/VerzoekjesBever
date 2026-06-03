@@ -4,12 +4,16 @@ import logging
 import os
 from pathlib import Path
 
-from nicegui import app, background_tasks, ui
-from spotipy.exceptions import SpotifyException
+from log_config import setup_logging
 
-from config import CONFIG
-from deps import get_service
-from pages import audience, benchmark, dj, login, spotify_auth, startup  # noqa: F401
+setup_logging()
+
+from nicegui import app, background_tasks, ui  # noqa: E402
+from spotipy.exceptions import SpotifyException  # noqa: E402
+
+from config import CONFIG  # noqa: E402
+from deps import get_service  # noqa: E402
+from pages import audience, benchmark, dj, login, spotify_auth, startup  # noqa: E402, F401
 
 logger = logging.getLogger(__name__)
 

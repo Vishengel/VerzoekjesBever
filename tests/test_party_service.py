@@ -812,6 +812,18 @@ def test_signal_track_ended():
     pytest.assume(result == PlaybackSignal.TRACK_ENDED)
 
 
+def test_signal_track_ended_progress_pegged_still_playing():
+    """Natural track end in isolation: Spotify keeps reporting is_playing=True
+    with progress_ms pegged exactly at duration_ms (observed 2026-06-03)."""
+    result = detect_playback_signal(
+        info=_playing_info(progress_ms=133600, duration_ms=133600),
+        current_track_uri=_SIG_URI,
+        our_state=PlaybackState.PLAYING,
+        in_settle_period=False,
+    )
+    pytest.assume(result == PlaybackSignal.TRACK_ENDED)
+
+
 def test_signal_external_resume():
     result = detect_playback_signal(
         info=_playing_info(),

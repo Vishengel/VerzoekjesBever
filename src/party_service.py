@@ -47,10 +47,15 @@ def detect_playback_signal(
             return PlaybackSignal.NOTHING
         return PlaybackSignal.TRACK_LOST
 
-    track_ended = (
-        not info.is_playing
-        and info.duration_ms > 0
-        and (info.duration_ms - info.progress_ms) < TRACK_END_THRESHOLD_MS
+    track_ended = info.duration_ms > 0 and (
+        # paused near end (e.g. skipped from another device)
+        (
+            not info.is_playing
+            and (info.duration_ms - info.progress_ms) < TRACK_END_THRESHOLD_MS
+        )
+        # natural end in isolated playback: Spotify keeps is_playing=True
+        # with progress_ms pegged at duration_ms
+        or info.progress_ms >= info.duration_ms
     )
     if track_ended:
         return PlaybackSignal.TRACK_ENDED
@@ -242,6 +247,13 @@ class PartyService:
             current_track_uri=current.track_uri if current else None,
             our_state=self._store.playback_state,
             in_settle_period=self._in_settle_period(),
+        )
+        logger.debug(
+            "poll: info=%s our_state=%s settle=%s -> signal=%s",
+            info,
+            self._store.playback_state,
+            self._in_settle_period(),
+            signal.value,
         )
 
         if signal in (PlaybackSignal.TRACK_ENDED, PlaybackSignal.TRACK_LOST):
