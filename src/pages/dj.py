@@ -7,6 +7,7 @@ from config import CONFIG
 from deps import get_service
 from keyed_list import KeyedList
 from models import (
+    ANONYMOUS_REQUESTER,
     PlaybackState,
     QueueItem,
     filter_queue_with_positions,
@@ -299,7 +300,7 @@ class DJPage:
             self._requester_input.value.strip() if self._requester_input.value else ""
         )
         if not requester:
-            requester = "🦫 (anonymous)"
+            requester = ANONYMOUS_REQUESTER
         added = self.svc.add_to_queue(replace(item, requester=requester), top=top)
         if not added:
             ui.notify(

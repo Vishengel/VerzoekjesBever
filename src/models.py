@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from uuid import uuid4
 
+ANONYMOUS_REQUESTER = "🦫 (anonymous)"
+
 
 class PlaybackState(StrEnum):
     IDLE = "idle"
