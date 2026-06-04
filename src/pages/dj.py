@@ -4,13 +4,13 @@ from nicegui import app, ui
 
 from config import CONFIG
 from deps import get_service
+from keyed_list import KeyedList
 from models import (
     PlaybackState,
     QueueItem,
     filter_queue_with_positions,
     format_queue_duration,
     format_queue_stats,
-    queue_render_signature,
 )
 from party_service import PartyService
 
@@ -59,6 +59,20 @@ def dj_row_vms(
     ]
 
 
+@dataclass
+class _DJRow:
+    root: ui.card
+    pos: ui.label
+    eta: ui.label
+    requester_row: ui.row
+    requester: ui.label
+    up: ui.button
+    down: ui.button
+    top: ui.button
+    is_first: bool = False
+    is_last: bool = False
+
+
 @ui.page("/dj", title="VerzoekjesBever - DJ", dark=True)
 def dj_page():
     if CONFIG.dj_password.get_secret_value() and not app.storage.user.get(
@@ -79,7 +93,6 @@ class DJPage:
         self._requester_input: ui.input | None = None
         self._search_results: ui.column | None = None
         self._search_timer: ui.timer | None = None
-        self._queue_display = None
         self._playback_controls = None
         self._queue_filter: str = ""
         self._show_all_queue: bool = False
@@ -218,7 +231,7 @@ class DJPage:
         ui.notify(
             f"Added '{item.track_name}' to {position} for {requester}", type="positive"
         )
-        self._queue_display.refresh()
+        self._render_queue()
 
     def _build_queue_panel(self):
         with ui.column().classes("w-1/2 p-6 gap-4 h-full"):
@@ -237,14 +250,45 @@ class DJPage:
                 on_change=self._on_queue_filter,
             ).classes("w-full").props("dense clearable outlined")
 
-            @ui.refreshable
-            def queue_display():
-                self._render_queue()
+            self._np_container = ui.column().classes("w-full gap-0")
+            self._np_sig = object()
 
-            self._queue_display = queue_display
-            queue_display()
+            with ui.row().classes("w-full items-center justify-between mt-2"):
+                with ui.row().classes("items-center gap-3"):
+                    ui.label("UP NEXT").classes("text-xs text-gray-400 tracking-widest")
+                    self._stats_label = ui.label("").classes(
+                        "text-sm font-medium text-green-400/80 "
+                        "bg-green-900/30 rounded-full px-3 py-0.5"
+                    )
+                self._clear_btn = ui.button(
+                    "Clear queue", on_click=self._confirm_clear_queue
+                ).props("flat dense color=negative size=sm")
 
+            self._empty_label = ui.label("No songs in queue yet").classes(
+                "text-gray-500 italic"
+            )
+            self._no_match_label = ui.label("No matching songs").classes(
+                "text-gray-500 italic"
+            )
+            self._list_container = ui.column().classes("w-full gap-2")
+            self._queue_list = KeyedList(
+                self._list_container,
+                key=lambda vm: vm.uid,
+                build=self._build_dj_row,
+                patch=self._patch_dj_row,
+            )
+            self._more_btn = (
+                ui.button("", on_click=self._toggle_show_all_queue)
+                .props("flat dense color=primary size=sm")
+                .classes("w-full mt-1")
+            )
+
+            self._render_all()
             self._build_update_timer()
+
+    def _render_all(self):
+        self._render_now_playing()
+        self._render_queue()
 
     def _build_device_selector(self):
         @ui.refreshable
@@ -268,7 +312,7 @@ class DJPage:
         device_selector()
 
     def _refresh_all(self):
-        self._queue_display.refresh()
+        self._render_all()
         self._playback_controls.refresh()
 
     def _render_playback_controls(self):
@@ -287,69 +331,30 @@ class DJPage:
                 "⏭ Next", on_click=lambda: (self.svc.play_next(), self._refresh_all())
             ).props("color=primary")
 
-    def _windowed_queue(self, queue):
-        """Return (filtered, visible) PositionedItem lists for the current view."""
-        filtered = filter_queue_with_positions(queue, self._queue_filter)
-        if self._show_all_queue or len(filtered) <= DJ_QUEUE_WINDOW:
-            return filtered, filtered
-        return filtered, filtered[:DJ_QUEUE_WINDOW]
-
-    def _render_queue(self):
+    def _render_now_playing(self):
         current = self.svc.get_currently_playing()
-        if current:
-            self._render_now_playing(current)
-        else:
-            state_label = (
-                "Paused"
-                if self.svc.playback_state == PlaybackState.PAUSED
-                else "Ready to play"
-            )
-            with ui.card().classes("w-full bg-gray-800 text-center p-6"):
-                ui.label(state_label).classes("text-gray-400 text-lg")
-
-        queue = self.svc.get_queue()
-        with ui.row().classes("w-full items-center justify-between mt-2"):
-            with ui.row().classes("items-center gap-3"):
-                ui.label("UP NEXT").classes("text-xs text-gray-400 tracking-widest")
-                if queue:
-                    ui.label(format_queue_stats(queue)).classes(
-                        "text-sm font-medium text-green-400/80 "
-                        "bg-green-900/30 rounded-full px-3 py-0.5"
-                    )
-            if queue:
-                ui.button("Clear queue", on_click=self._confirm_clear_queue).props(
-                    "flat dense color=negative size=sm"
-                )
-
-        if not queue:
-            ui.label("No songs in queue yet").classes("text-gray-500 italic")
+        sig = (
+            (current.uid, current.requester)
+            if current
+            else ("paused" if self.svc.playback_state == PlaybackState.PAUSED else None)
+        )
+        if sig == self._np_sig:
             return
+        self._np_sig = sig
+        self._np_container.clear()
+        with self._np_container:
+            if current:
+                self._render_now_playing_card(current)
+            else:
+                state_label = (
+                    "Paused"
+                    if self.svc.playback_state == PlaybackState.PAUSED
+                    else "Ready to play"
+                )
+                with ui.card().classes("w-full bg-gray-800 text-center p-6"):
+                    ui.label(state_label).classes("text-gray-400 text-lg")
 
-        filtered, visible = self._windowed_queue(queue)
-        if self._queue_filter and not filtered:
-            ui.label("No matching songs").classes("text-gray-500 italic")
-
-        for positioned in visible:
-            self._render_queue_item(
-                positioned.position - 1,
-                positioned.item,
-                len(queue),
-                positioned.eta_ms,
-            )
-
-        hidden = len(filtered) - len(visible)
-        if hidden > 0:
-            ui.button(
-                f"Show all {len(filtered)} songs (+{hidden} hidden)",
-                on_click=self._toggle_show_all_queue,
-            ).props("flat dense color=primary size=sm").classes("w-full mt-1")
-        elif self._show_all_queue and len(filtered) > DJ_QUEUE_WINDOW:
-            ui.button(
-                "Show less",
-                on_click=self._toggle_show_all_queue,
-            ).props("flat dense color=grey size=sm").classes("w-full mt-1")
-
-    def _render_now_playing(self, current: QueueItem):
+    def _render_now_playing_card(self, current: QueueItem):
         with ui.card().classes("w-full bg-gray-900 border-2 border-green-500"):
             ui.label("NOW PLAYING").classes("text-xs text-gray-400 tracking-widest")
             with ui.row().classes("items-center gap-4"):
@@ -368,116 +373,156 @@ class DJPage:
                         ).classes("text-sm text-orange-400")
                         ui.button(
                             icon="edit",
-                            on_click=lambda uid=current.uid,
-                            name=current.requester: self._open_edit_requester(
-                                uid, name
+                            on_click=lambda uid=current.uid: self._open_edit_requester(
+                                uid
                             ),
                         ).props("flat round dense size=xs color=orange")
 
-    def _render_queue_item(
-        self, index: int, item: QueueItem, queue_len: int, eta_ms: int
-    ):
-        with ui.card().classes("w-full bg-gray-900"):
+    def _render_queue(self):
+        queue = self.svc.get_queue()
+        self._stats_label.set_text(format_queue_stats(queue) if queue else "")
+        self._clear_btn.set_visibility(bool(queue))
+        self._empty_label.set_visibility(not queue)
+
+        vms = dj_row_vms(
+            queue,
+            filter_term=self._queue_filter,
+            window=DJ_QUEUE_WINDOW,
+            show_all=self._show_all_queue,
+        )
+        filtered_count = len(filter_queue_with_positions(queue, self._queue_filter))
+        self._no_match_label.set_visibility(
+            bool(self._queue_filter) and filtered_count == 0
+        )
+        self._queue_list.reconcile(vms)
+
+        hidden = filtered_count - len(vms)
+        if hidden > 0:
+            self._more_btn.set_text(
+                f"Show all {filtered_count} songs (+{hidden} hidden)"
+            )
+            self._more_btn.props(remove="color=grey", add="color=primary")
+            self._more_btn.set_visibility(True)
+        elif self._show_all_queue and filtered_count > DJ_QUEUE_WINDOW:
+            self._more_btn.set_text("Show less")
+            self._more_btn.props(remove="color=primary", add="color=grey")
+            self._more_btn.set_visibility(True)
+        else:
+            self._more_btn.set_visibility(False)
+
+    def _build_dj_row(self, vm: DJRowVM) -> _DJRow:
+        card = ui.card().classes("w-full bg-gray-900")
+        with card:
             with ui.row().classes("items-center gap-3"):
                 with ui.column().classes("items-center gap-0 w-12"):
-                    ui.label(str(index + 1)).classes(
+                    pos = ui.label(str(vm.position)).classes(
                         "text-gray-500 font-bold text-center"
                     )
-                    eta_text = (
-                        "Up next!"
-                        if eta_ms == 0
-                        else f"ETA {format_queue_duration(eta_ms)}"
-                    )
-                    ui.label(eta_text).classes(
+                    eta = ui.label("").classes(
                         "text-[10px] text-green-400/70 text-center leading-tight"
                     )
                 with ui.column().classes("flex-grow gap-0"):
-                    ui.label(item.track_name).classes("font-semibold")
-                    ui.label(item.artist).classes("text-sm text-gray-400")
-                    if item.requester:
-                        with ui.row().classes("items-center gap-1"):
-                            ui.label(f"🎤 {item.requester}").classes(
-                                "text-xs text-orange-400 mt-0.5"
-                            )
-                            ui.button(
-                                icon="edit",
-                                on_click=lambda uid=item.uid,
-                                name=item.requester: self._open_edit_requester(
-                                    uid, name
-                                ),
-                            ).props("flat round dense size=xs color=orange")
+                    ui.label(vm.track_name).classes("font-semibold")
+                    ui.label(vm.artist).classes("text-sm text-gray-400")
+                    requester_row = ui.row().classes("items-center gap-1")
+                    with requester_row:
+                        requester = ui.label("").classes(
+                            "text-xs text-orange-400 mt-0.5"
+                        )
+                        ui.button(
+                            icon="edit",
+                            on_click=lambda uid=vm.uid: self._open_edit_requester(uid),
+                        ).props("flat round dense size=xs color=orange")
                 with ui.column().classes("gap-0"):
-                    up_btn = ui.button(
+                    up = ui.button(
                         icon="arrow_upward",
-                        on_click=lambda uid=item.uid: (
+                        on_click=lambda uid=vm.uid: (
                             self.svc.move_up(uid),
-                            self._queue_display.refresh(),
+                            self._render_queue(),
                         ),
                     ).props("flat round dense color=warning size=sm")
-                    if index == 0:
-                        up_btn.props(add="disable")
-                    down_btn = ui.button(
+                    down = ui.button(
                         icon="arrow_downward",
-                        on_click=lambda uid=item.uid: (
+                        on_click=lambda uid=vm.uid: (
                             self.svc.move_down(uid),
-                            self._queue_display.refresh(),
+                            self._render_queue(),
                         ),
                     ).props("flat round dense color=warning size=sm")
-                    if index == queue_len - 1:
-                        down_btn.props(add="disable")
-                top_btn = ui.button(
+                top = ui.button(
                     icon="vertical_align_top",
-                    on_click=lambda uid=item.uid: (
+                    on_click=lambda uid=vm.uid: (
                         self.svc.move_to_top(uid),
-                        self._queue_display.refresh(),
+                        self._render_queue(),
                     ),
                 ).props("flat round dense color=orange size=sm")
-                if index == 0:
-                    top_btn.props(add="disable")
                 ui.button(
                     icon="delete",
-                    on_click=lambda uid=item.uid: (
+                    on_click=lambda uid=vm.uid: (
                         self.svc.remove_from_queue(uid),
-                        self._queue_display.refresh(),
+                        self._render_queue(),
                     ),
                 ).props("flat round dense color=negative")
+        handle = _DJRow(
+            root=card,
+            pos=pos,
+            eta=eta,
+            requester_row=requester_row,
+            requester=requester,
+            up=up,
+            down=down,
+            top=top,
+        )
+        self._patch_dj_row(handle, vm)
+        return handle
+
+    def _patch_dj_row(self, h: _DJRow, vm: DJRowVM):
+        if h.pos.text != str(vm.position):
+            h.pos.set_text(str(vm.position))
+        eta_text = (
+            "Up next!" if vm.eta_ms == 0 else f"ETA {format_queue_duration(vm.eta_ms)}"
+        )
+        if h.eta.text != eta_text:
+            h.eta.set_text(eta_text)
+        req_text = f"🎤 {vm.requester}" if vm.requester else ""
+        if h.requester.text != req_text:
+            h.requester.set_text(req_text)
+        h.requester_row.set_visibility(bool(vm.requester))
+        if h.is_first != vm.is_first:
+            h.is_first = vm.is_first
+            for btn in (h.up, h.top):
+                if vm.is_first:
+                    btn.props(add="disable")
+                else:
+                    btn.props(remove="disable")
+        if h.is_last != vm.is_last:
+            h.is_last = vm.is_last
+            if vm.is_last:
+                h.down.props(add="disable")
+            else:
+                h.down.props(remove="disable")
 
     def _on_queue_filter(self, e):
         self._queue_filter = e.value or ""
-        self._queue_display.refresh()
+        self._render_queue()
 
     def _toggle_show_all_queue(self):
         self._show_all_queue = not self._show_all_queue
-        self._queue_display.refresh()
-
-    def _queue_signature(self):
-        queue = self.svc.get_queue()
-        _, visible = self._windowed_queue(queue)
-        return queue_render_signature(
-            self.svc.get_currently_playing(),
-            [p.item for p in visible],
-            self.svc.playback_state,
-            len(queue),
-        )
+        self._render_queue()
 
     def _build_update_timer(self):
         local_version = {"v": self.svc.version}
-        render_sig = {"v": self._queue_signature()}
 
         def check_updates():
             if self.svc.version == local_version["v"]:
                 return
             local_version["v"] = self.svc.version
-            # Playback controls are cheap and state-driven; always refresh them.
             self._playback_controls.refresh()
-            sig = self._queue_signature()
-            if sig != render_sig["v"]:
-                render_sig["v"] = sig
-                self._queue_display.refresh()
+            self._render_all()
 
         ui.timer(1.0, check_updates)
 
-    def _open_edit_requester(self, uid: str, current_name: str):
+    def _open_edit_requester(self, uid: str):
+        current_name = self.svc.get_requester(uid)
         with ui.dialog() as dialog, ui.card().classes("bg-gray-900 min-w-[300px]"):
             ui.label("Edit requester").classes("text-lg font-bold")
             name_input = ui.input(
@@ -488,7 +533,8 @@ class DJPage:
 
             def save():
                 self.svc.update_requester(uid, name_input.value.strip())
-                self._queue_display.refresh()
+                self._render_queue()
+                self._render_now_playing()
                 dialog.close()
 
             name_input.on("keydown.enter", save)
@@ -507,7 +553,8 @@ class DJPage:
 
             def clear():
                 self.svc.clear_queue()
-                self._queue_display.refresh()
+                self._render_queue()
+                self._render_now_playing()
                 dialog.close()
                 ui.notify("Queue cleared", type="info")
 
