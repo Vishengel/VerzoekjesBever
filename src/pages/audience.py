@@ -9,6 +9,7 @@ from nicegui import ui
 from deps import get_service
 from models import (
     PartyEventType,
+    filter_queue_with_positions,
     format_queue_duration,
     format_queue_stats,
     search_queue,
@@ -113,8 +114,9 @@ def audience_page():
                         "bg-white/5 rounded-full px-4 py-1"
                     )
                 with ui.card().classes("w-full bg-white/5 rounded-xl p-1"):
-                    visible = queue[:QUEUE_WINDOW]
-                    for i, item in enumerate(visible):
+                    visible = filter_queue_with_positions(queue, "")[:QUEUE_WINDOW]
+                    for i, positioned in enumerate(visible):
+                        item = positioned.item
                         border = (
                             "border-b border-white/5" if i < len(visible) - 1 else ""
                         )
@@ -158,6 +160,18 @@ def audience_page():
                                         ui.label(f"🎤 {item.requester}").classes(
                                             "text-orange-400 text-xs mt-0.5"
                                         )
+                                if positioned.eta_ms == 0:
+                                    ui.label("Up next").classes(
+                                        "text-green-400 font-bold text-sm "
+                                        "whitespace-nowrap ml-2"
+                                    )
+                                else:
+                                    eta = format_queue_duration(positioned.eta_ms)
+                                    ui.label(f"⏱ {eta}").classes(
+                                        "text-green-300/70 font-semibold text-sm "
+                                        "whitespace-nowrap ml-2 bg-white/5 "
+                                        "rounded-full px-3 py-1"
+                                    )
                     hidden = len(queue) - len(visible)
                     if hidden > 0:
                         ui.label(
