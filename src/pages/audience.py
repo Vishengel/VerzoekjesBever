@@ -157,6 +157,11 @@ def audience_page():
                                         ui.label(f"🎤 {item.requester}").classes(
                                             "text-orange-400 text-xs mt-0.5"
                                         )
+                    hidden = len(queue) - len(visible)
+                    if hidden > 0:
+                        ui.label(
+                            f"+ {hidden} more song{'s' if hidden != 1 else ''}"
+                        ).classes("text-center text-gray-500 text-sm py-2")
 
         playlist_display()
 
