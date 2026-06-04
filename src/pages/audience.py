@@ -137,7 +137,9 @@ def audience_page():
                         )
 
                         with container:
-                            row_classes = f"items-center gap-3 px-4 py-3 {border}"
+                            row_classes = (
+                                f"items-center gap-3 px-4 py-3 w-full {border}"
+                            )
                             if is_target:
                                 row_classes += " beaver-incoming"
                             if is_glow:
