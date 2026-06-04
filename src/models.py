@@ -39,6 +39,31 @@ class PlaybackInfo:
     track_uri: str | None = None
 
 
+def select_album_art(images: list[dict]) -> tuple[str, str]:
+    """Pick (full_url, thumb_url) from a Spotify album images array.
+
+    Spotify returns several sizes (typically 640/300/64px) ordered widest-first,
+    each with an optional ``width``. ``full`` is the smallest image at least
+    200px wide (≈300px) — enough for the now-playing card without shipping the
+    640px original to every client. ``thumb`` is the smallest image (≈64px) for
+    the tiny queue-row covers. Falls back to the largest image when nothing
+    meets the threshold or widths are missing; ``[]`` yields ``("", "")``.
+    """
+    if not images:
+        return "", ""
+
+    def width(img: dict) -> int:
+        return img.get("width") or 0
+
+    ordered = sorted(images, key=width)  # ascending; stable for equal/missing
+    thumb = ordered[0]["url"]
+    full = next(
+        (img["url"] for img in ordered if width(img) >= 200),
+        ordered[-1]["url"],
+    )
+    return full, thumb
+
+
 @dataclass(frozen=True)
 class QueueItem:
     track_name: str
@@ -46,6 +71,7 @@ class QueueItem:
     album_art_url: str
     requester: str
     track_uri: str
+    thumb_url: str = ""
     duration_ms: int = 0
     uid: str = field(default_factory=lambda: uuid4().hex[:8])
 
@@ -54,23 +80,26 @@ class QueueItem:
 
     @classmethod
     def from_dict(cls, data: dict) -> "QueueItem":
+        full = data["album_art_url"]
         return cls(
             track_name=data["track_name"],
             artist=data["artist"],
-            album_art_url=data["album_art_url"],
+            album_art_url=full,
             track_uri=data["track_uri"],
             requester=data["requester"],
+            thumb_url=data.get("thumb_url") or full,
             duration_ms=data.get("duration_ms", 0),
             uid=data.get("uid", uuid4().hex[:8]),
         )
 
     @classmethod
     def from_spotify_track(cls, track: dict, requester: str) -> "QueueItem":
-        images = track["album"]["images"]
+        full, thumb = select_album_art(track["album"]["images"])
         return cls(
             track_name=track["name"],
             artist=track["artists"][0]["name"],
-            album_art_url=images[0]["url"] if images else "",
+            album_art_url=full,
+            thumb_url=thumb,
             requester=requester,
             track_uri=track["uri"],
             duration_ms=track.get("duration_ms", 0),

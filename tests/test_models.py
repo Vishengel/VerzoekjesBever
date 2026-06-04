@@ -3,8 +3,76 @@ from models import (
     PlaybackState,
     search_queue,
     filter_queue_with_positions,
+    select_album_art,
 )
 import pytest
+
+
+def _img(url, width):
+    return {"url": url, "height": width, "width": width}
+
+
+def test_select_album_art_picks_full_near_300_and_smallest_thumb():
+    images = [_img("big", 640), _img("mid", 300), _img("tiny", 64)]
+    full, thumb = select_album_art(images)
+    pytest.assume(full == "mid")
+    pytest.assume(thumb == "tiny")
+
+
+def test_select_album_art_handles_unsorted_input():
+    images = [_img("tiny", 64), _img("big", 640), _img("mid", 300)]
+    full, thumb = select_album_art(images)
+    pytest.assume(full == "mid")
+    pytest.assume(thumb == "tiny")
+
+
+def test_select_album_art_single_image():
+    full, thumb = select_album_art([_img("only", 640)])
+    pytest.assume(full == "only")
+    pytest.assume(thumb == "only")
+
+
+def test_select_album_art_empty():
+    pytest.assume(select_album_art([]) == ("", ""))
+
+
+def test_select_album_art_missing_widths_falls_back_to_largest():
+    # No widths -> can't size; thumb = first, full = last (Spotify orders widest-first).
+    images = [{"url": "a"}, {"url": "b"}, {"url": "c"}]
+    full, thumb = select_album_art(images)
+    pytest.assume(thumb == "a")
+    pytest.assume(full == "c")
+
+
+def test_select_album_art_no_image_above_threshold_uses_largest():
+    images = [_img("a", 64), _img("b", 100)]
+    full, thumb = select_album_art(images)
+    pytest.assume(full == "b")
+    pytest.assume(thumb == "a")
+
+
+def test_from_spotify_track_sets_thumb_and_full():
+    track = {
+        "name": "Song",
+        "artists": [{"name": "Artist"}],
+        "album": {"images": [_img("big", 640), _img("mid", 300), _img("tiny", 64)]},
+        "uri": "spotify:track:x",
+    }
+    item = QueueItem.from_spotify_track(track, requester="Guest")
+    pytest.assume(item.album_art_url == "mid")
+    pytest.assume(item.thumb_url == "tiny")
+
+
+def test_from_dict_thumb_falls_back_to_full_for_legacy_data():
+    legacy = {
+        "track_name": "Old",
+        "artist": "Artist",
+        "album_art_url": "https://i.scdn.co/image/640",
+        "track_uri": "spotify:track:old",
+        "requester": "X",
+    }
+    item = QueueItem.from_dict(legacy)
+    pytest.assume(item.thumb_url == "https://i.scdn.co/image/640")
 
 
 def _item(track_name="Song", artist="Artist", requester="Guest", duration_ms=0):

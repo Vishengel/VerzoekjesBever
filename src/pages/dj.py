@@ -149,8 +149,8 @@ class DJPage:
     def _render_search_result(self, item: QueueItem):
         with ui.card().classes("w-full bg-gray-800"):
             with ui.row().classes("items-center gap-3"):
-                if item.album_art_url:
-                    ui.image(item.album_art_url).classes("w-12 h-12 rounded")
+                if item.thumb_url:
+                    ui.image(item.thumb_url).classes("w-12 h-12 rounded")
                 with ui.column().classes("flex-grow gap-0"):
                     ui.label(item.track_name).classes("font-semibold")
                     ui.label(item.artist).classes("text-sm text-gray-400")
@@ -346,8 +346,8 @@ class DJPage:
                     ui.label(eta_text).classes(
                         "text-[10px] text-green-400/70 text-center leading-tight"
                     )
-                if item.album_art_url:
-                    ui.image(item.album_art_url).classes("w-10 h-10 rounded")
+                if item.thumb_url:
+                    ui.image(item.thumb_url).classes("w-10 h-10 rounded")
                 with ui.column().classes("flex-grow gap-0"):
                     ui.label(item.track_name).classes("font-semibold")
                     ui.label(item.artist).classes("text-sm text-gray-400")

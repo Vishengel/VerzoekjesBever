@@ -142,8 +142,8 @@ def audience_page():
                                 ui.label(str(i + 1)).classes(
                                     "text-green-400 font-extrabold text-lg w-7 text-center"
                                 )
-                                if item.album_art_url:
-                                    ui.image(item.album_art_url).classes(
+                                if item.thumb_url:
+                                    ui.image(item.thumb_url).classes(
                                         "w-11 h-11 rounded-md"
                                     )
                                 with ui.column().classes("flex-grow gap-0"):
