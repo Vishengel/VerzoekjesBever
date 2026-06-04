@@ -110,3 +110,40 @@ function triggerBeaverAddAnimation(isPriority) {
         }, cleanupDelay);
     }
 }
+
+function triggerPaidSkipOverlay(message) {
+    var existing = document.querySelector('.paid-skip-overlay');
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.className = 'paid-skip-overlay';
+    overlay.textContent = message;
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.zIndex = '200';
+    overlay.style.padding = '32px 24px';
+    overlay.style.textAlign = 'center';
+    overlay.style.fontSize = '2.5rem';
+    overlay.style.fontWeight = '800';
+    overlay.style.color = '#ffffff';
+    overlay.style.background = 'rgba(13, 13, 26, 0.92)';
+    overlay.style.borderBottom = '4px solid #4ade80';
+    overlay.style.backdropFilter = 'blur(6px)';
+    overlay.style.boxShadow = '0 8px 32px rgba(0,0,0,0.5)';
+
+    document.body.appendChild(overlay);
+
+    var anim = overlay.animate(
+        [
+            { opacity: 0, transform: 'translateY(-40px)' },
+            { opacity: 1, transform: 'translateY(0)', offset: 0.08 },
+            { opacity: 1, transform: 'translateY(0)', offset: 0.85 },
+            { opacity: 0, transform: 'translateY(-40px)' }
+        ],
+        { duration: 6000, easing: 'ease-in-out' }
+    );
+
+    anim.onfinish = function () { overlay.remove(); };
+}
