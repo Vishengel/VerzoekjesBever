@@ -228,6 +228,27 @@ def test_poll_track_ended_empty_queue_goes_idle(service, mock_spotify):
     pytest.assume(service.get_currently_playing() is None)
 
 
+def test_restart_mid_playback_does_not_spuriously_advance(mock_spotify, store):
+    # A session was playing; then the server process restarts (settle period,
+    # held only in memory, is lost). Simulate by building a fresh service on a
+    # store that already has a playing track.
+    store.start_session("Party", "dev1")
+    store.set_currently_playing(
+        _make_item("Song1", uri="spotify:track:s1"), PlaybackState.PLAYING
+    )
+    store.add_to_queue(_make_item("Song2", uri="spotify:track:s2"))
+
+    restarted = PartyService(spotify=mock_spotify, store=store)
+
+    # First poll after restart: Spotify hasn't reported the track yet.
+    mock_spotify.get_playback_state.return_value = None
+    restarted.poll_playback()
+
+    # The seeded settle window must suppress the TRACK_LOST verdict.
+    pytest.assume(restarted.get_currently_playing().track_name == "Song1")
+    mock_spotify.play_track.assert_not_called()
+
+
 def test_poll_still_playing_no_change(service, mock_spotify):
     service.start_session("Party", "dev1")
     service.add_to_queue(_make_item(requester="Lisa"))

@@ -86,7 +86,12 @@ class PartyService:
         self._events: list[PartyEvent] = []
         self._beaver_enabled: bool = True
         self._show_qr_code: bool = False
-        self._playback_commanded_at: float = 0.0
+        # Settle period lives in memory: a fresh process must not instantly
+        # treat a resumed-but-playing session as a lost track before Spotify
+        # has even been polled once. Seed the window when restoring playback.
+        self._playback_commanded_at: float = (
+            time.monotonic() if store.currently_playing is not None else 0.0
+        )
 
     @property
     def version(self) -> int:
