@@ -1,4 +1,4 @@
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
 from nicegui import app, ui
 
@@ -15,6 +15,48 @@ from models import (
 from party_service import PartyService
 
 DJ_QUEUE_WINDOW = 50
+
+
+@dataclass(frozen=True)
+class DJRowVM:
+    uid: str
+    track_name: str
+    artist: str
+    requester: str
+    position: int  # 1-based real queue position
+    eta_ms: int
+    is_first: bool  # disables up + top buttons
+    is_last: bool  # disables down button
+
+
+def dj_row_vms(
+    queue: list,
+    *,
+    filter_term: str,
+    window: int,
+    show_all: bool,
+) -> list[DJRowVM]:
+    """Pure view-models for the DJ queue rows (filtered + windowed, with ETA).
+
+    ``is_first`` is keyed to the row's *real* queue position (position == 1), so
+    button-enabling matches the unfiltered queue, not the visible slice.
+    """
+    filtered = filter_queue_with_positions(queue, filter_term)
+    visible = filtered if (show_all or len(filtered) <= window) else filtered[:window]
+    last_real = len(queue)
+    return [
+        DJRowVM(
+            uid=p.item.uid,
+            track_name=p.item.track_name,
+            artist=p.item.artist,
+            requester=p.item.requester or "",
+            position=p.position,
+            eta_ms=p.eta_ms,
+            is_first=p.position == 1,
+            is_last=p.position == last_real,
+        )
+        for p in visible
+    ]
 
 
 @ui.page("/dj", title="VerzoekjesBever - DJ", dark=True)
