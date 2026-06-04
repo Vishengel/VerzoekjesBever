@@ -7,7 +7,9 @@ import segno
 from nicegui import ui
 
 from deps import get_service
-from models import PartyEventType, format_queue_duration
+from models import PartyEventType, format_queue_duration, search_queue
+
+QUEUE_WINDOW = 30
 
 
 def _get_local_ip() -> str:
@@ -110,8 +112,11 @@ def audience_page():
                         "bg-white/5 rounded-full px-4 py-1"
                     )
                 with ui.card().classes("w-full bg-white/5 rounded-xl p-1"):
-                    for i, item in enumerate(queue):
-                        border = "border-b border-white/5" if i < len(queue) - 1 else ""
+                    visible = queue[:QUEUE_WINDOW]
+                    for i, item in enumerate(visible):
+                        border = (
+                            "border-b border-white/5" if i < len(visible) - 1 else ""
+                        )
                         is_target = (
                             pending_add["uri"] and item.track_uri == pending_add["uri"]
                         )
@@ -178,6 +183,67 @@ def audience_page():
 
         qr_overlay()
 
+        with (
+            ui.dialog() as search_dialog,
+            ui.card().classes("w-full max-w-md bg-gray-900 rounded-xl p-5 gap-3"),
+        ):
+            ui.label("🔍 Find your song").classes("text-lg font-bold text-white")
+            search_input = (
+                ui.input("Song, artist, or your name")
+                .classes("w-full")
+                .props("autofocus clearable dark")
+            )
+
+            @ui.refreshable
+            def search_results():
+                query = (search_input.value or "").strip()
+                if not query:
+                    ui.label("Type a song, artist, or your name").classes(
+                        "text-gray-500 text-sm"
+                    )
+                    return
+                matches = search_queue(
+                    svc.get_queue(), svc.get_currently_playing(), query
+                )
+                if not matches:
+                    ui.label("Not in the queue right now").classes("text-gray-400")
+                    ui.label("Ask the DJ!").classes("text-gray-500 text-sm")
+                    return
+                for match in matches:
+                    with ui.row().classes(
+                        "items-center gap-3 w-full py-2 border-b border-white/5"
+                    ):
+                        with ui.column().classes("gap-0 flex-grow"):
+                            ui.label(match.item.track_name).classes(
+                                "text-white font-semibold"
+                            )
+                            ui.label(match.item.artist).classes("text-gray-400 text-sm")
+                        if match.now_playing:
+                            ui.label("🎉 Playing right now!").classes(
+                                "text-green-400 font-bold whitespace-nowrap"
+                            )
+                        elif match.eta_ms == 0:
+                            ui.label(f"#{match.position} · Up next!").classes(
+                                "text-green-300 font-semibold whitespace-nowrap"
+                            )
+                        else:
+                            eta = format_queue_duration(match.eta_ms)
+                            ui.label(f"#{match.position} · ~{eta}").classes(
+                                "text-green-300 font-semibold whitespace-nowrap"
+                            )
+
+            search_input.on_value_change(lambda: search_results.refresh())
+            search_results()
+            ui.button("Close", on_click=search_dialog.close).props("flat").classes(
+                "self-end text-gray-400"
+            )
+
+        ui.button(icon="search", on_click=search_dialog.open).props(
+            "round color=green"
+        ).style(
+            "position: fixed; bottom: 24px; right: 24px; z-index: 100; opacity: 0.55;"
+        )
+
         local_version = {"v": svc.version}
 
         async def check_updates():
@@ -206,6 +272,7 @@ def audience_page():
 
             playlist_display.refresh()
             qr_overlay.refresh()
+            search_results.refresh()
 
             if pending_add["uri"]:
                 is_priority = any(

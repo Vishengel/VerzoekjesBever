@@ -1,5 +1,16 @@
-from models import QueueItem, PlaybackState
+from models import QueueItem, PlaybackState, search_queue
 import pytest
+
+
+def _item(track_name="Song", artist="Artist", requester="Guest", duration_ms=0):
+    return QueueItem(
+        track_name=track_name,
+        artist=artist,
+        album_art_url="",
+        requester=requester,
+        track_uri=f"spotify:track:{track_name}",
+        duration_ms=duration_ms,
+    )
 
 
 def test_playback_state_values():
@@ -86,3 +97,77 @@ def test_queue_item_from_spotify_track_no_album_art():
     }
     item = QueueItem.from_spotify_track(spotify_track, requester="Guest")
     pytest.assume(item.album_art_url == "")
+
+
+def test_search_queue_matches_each_field():
+    queue = [
+        _item(track_name="Africa", artist="Toto", requester="Gralg de Onsterfelijke"),
+        _item(track_name="Hey Jude", artist="The Beatles", requester="Sam"),
+    ]
+    by_title = search_queue(queue, None, "africa")
+    by_artist = search_queue(queue, None, "beatles")
+    by_requester = search_queue(queue, None, "gralg")
+    pytest.assume(len(by_title) == 1 and by_title[0].item.track_name == "Africa")
+    pytest.assume(len(by_artist) == 1 and by_artist[0].item.artist == "The Beatles")
+    pytest.assume(
+        len(by_requester) == 1
+        and by_requester[0].item.requester == "Gralg de Onsterfelijke"
+    )
+
+
+def test_search_queue_case_insensitive():
+    queue = [_item(track_name="Bohemian Rhapsody", artist="Queen")]
+    pytest.assume(len(search_queue(queue, None, "QUEEN")) == 1)
+    pytest.assume(len(search_queue(queue, None, "bOhEmIaN")) == 1)
+
+
+def test_search_queue_position_is_one_based():
+    queue = [_item(track_name="A"), _item(track_name="B"), _item(track_name="C")]
+    matches = search_queue(queue, None, "B")
+    pytest.assume(len(matches) == 1)
+    pytest.assume(matches[0].position == 2)
+    pytest.assume(matches[0].now_playing is False)
+
+
+def test_search_queue_eta_sums_songs_ahead():
+    queue = [
+        _item(track_name="A", duration_ms=180_000),
+        _item(track_name="B", duration_ms=200_000),
+        _item(track_name="C", duration_ms=240_000),
+    ]
+    # C is 3rd: ETA = duration of A + B = 380_000ms
+    match = search_queue(queue, None, "C")[0]
+    pytest.assume(match.eta_ms == 380_000)
+
+
+def test_search_queue_currently_playing_match():
+    current = _item(track_name="Now Playing Song", artist="Toto")
+    queue = [_item(track_name="Other")]
+    matches = search_queue(queue, current, "toto")
+    pytest.assume(len(matches) == 1)
+    pytest.assume(matches[0].now_playing is True)
+    pytest.assume(matches[0].position == 0)
+    pytest.assume(matches[0].eta_ms == 0)
+
+
+def test_search_queue_empty_query():
+    queue = [_item(track_name="Anything")]
+    pytest.assume(search_queue(queue, None, "") == [])
+    pytest.assume(search_queue(queue, None, "   ") == [])
+
+
+def test_search_queue_no_match():
+    queue = [
+        _item(track_name="Africa", artist="Toto", requester="Gralg de Onsterfelijke")
+    ]
+    pytest.assume(search_queue(queue, None, "zzzz") == [])
+
+
+def test_search_queue_multiple_matches_in_queue_order():
+    queue = [
+        _item(track_name="Toto Song A", duration_ms=100_000),
+        _item(track_name="Other"),
+        _item(track_name="Toto Song B", duration_ms=100_000),
+    ]
+    matches = search_queue(queue, None, "toto")
+    pytest.assume([m.position for m in matches] == [1, 3])

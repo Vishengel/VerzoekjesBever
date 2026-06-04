@@ -77,6 +77,54 @@ class QueueItem:
         )
 
 
+@dataclass(frozen=True)
+class QueueMatch:
+    item: QueueItem
+    position: int  # 1-based queue position; 0 when now_playing
+    eta_ms: int  # ms until it plays; 0 when now_playing
+    now_playing: bool
+
+
+def search_queue(
+    queue: list[QueueItem],
+    current: QueueItem | None,
+    query: str,
+) -> list[QueueMatch]:
+    """Find songs matching a free-text query, with queue position and rough ETA.
+
+    Case-insensitive substring over track_name + artist + requester. ETA for the
+    item at index i is the sum of duration_ms of the items ahead of it
+    (queue[0:i]); the currently-playing song is treated as ~done and not counted.
+    A matching current song yields now_playing=True, position=0, eta_ms=0.
+    An empty or whitespace-only query returns no matches.
+    """
+    needle = query.strip().lower()
+    if not needle:
+        return []
+
+    def matches(item: QueueItem) -> bool:
+        haystack = f"{item.track_name} {item.artist} {item.requester or ''}".lower()
+        return needle in haystack
+
+    results: list[QueueMatch] = []
+    if current is not None and matches(current):
+        results.append(QueueMatch(item=current, position=0, eta_ms=0, now_playing=True))
+
+    eta_ms = 0
+    for index, item in enumerate(queue):
+        if matches(item):
+            results.append(
+                QueueMatch(
+                    item=item,
+                    position=index + 1,
+                    eta_ms=eta_ms,
+                    now_playing=False,
+                )
+            )
+        eta_ms += item.duration_ms
+    return results
+
+
 def format_queue_duration(total_ms: int) -> str:
     total_seconds = total_ms // 1000
     hours, remainder = divmod(total_seconds, 3600)
