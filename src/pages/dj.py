@@ -217,6 +217,21 @@ class DJPage:
 
                 end_time_control()
 
+                @ui.refreshable
+                def skip_msg_toggle():
+                    enabled = self.svc.skip_messages_enabled
+                    ui.button(
+                        "💬 Shame ON" if enabled else "🤐 Shame OFF",
+                        on_click=lambda: (
+                            self.svc.set_skip_messages_enabled(not enabled),
+                            skip_msg_toggle.refresh(),
+                        ),
+                    ).props(
+                        f"{'color=positive' if enabled else 'color=negative'} dense"
+                    )
+
+                skip_msg_toggle()
+
                 ui.button(
                     "Display",
                     on_click=lambda: ui.run_javascript(
