@@ -9,6 +9,7 @@ from models import (
     QueueItem,
     filter_queue_with_positions,
     format_queue_duration,
+    format_queue_stats,
 )
 from party_service import PartyService
 
@@ -261,11 +262,7 @@ class DJPage:
             with ui.row().classes("items-center gap-3"):
                 ui.label("UP NEXT").classes("text-xs text-gray-400 tracking-widest")
                 if queue:
-                    total_ms = sum(item.duration_ms for item in queue)
-                    stats = f"⏱ {len(queue)} songs"
-                    if total_ms:
-                        stats += f" · {format_queue_duration(total_ms)} remaining"
-                    ui.label(stats).classes(
+                    ui.label(format_queue_stats(queue)).classes(
                         "text-sm font-medium text-green-400/80 "
                         "bg-green-900/30 rounded-full px-3 py-0.5"
                     )
@@ -282,8 +279,8 @@ class DJPage:
         if self._queue_filter and not filtered:
             ui.label("No matching songs").classes("text-gray-500 italic")
 
-        windowed = self._show_all_queue or len(filtered) <= DJ_QUEUE_WINDOW
-        visible = filtered if windowed else filtered[:DJ_QUEUE_WINDOW]
+        show_all = self._show_all_queue or len(filtered) <= DJ_QUEUE_WINDOW
+        visible = filtered if show_all else filtered[:DJ_QUEUE_WINDOW]
         for positioned in visible:
             self._render_queue_item(
                 positioned.position - 1,
@@ -296,12 +293,12 @@ class DJPage:
         if hidden > 0:
             ui.button(
                 f"Show all {len(filtered)} songs (+{hidden} hidden)",
-                on_click=self._show_all_queue_items,
+                on_click=self._toggle_show_all_queue,
             ).props("flat dense color=primary size=sm").classes("w-full mt-1")
         elif self._show_all_queue and len(filtered) > DJ_QUEUE_WINDOW:
             ui.button(
                 "Show less",
-                on_click=self._show_fewer_queue_items,
+                on_click=self._toggle_show_all_queue,
             ).props("flat dense color=grey size=sm").classes("w-full mt-1")
 
     def _render_now_playing(self, current: QueueItem):
@@ -403,12 +400,8 @@ class DJPage:
         self._queue_filter = e.value or ""
         self._queue_display.refresh()
 
-    def _show_all_queue_items(self):
-        self._show_all_queue = True
-        self._queue_display.refresh()
-
-    def _show_fewer_queue_items(self):
-        self._show_all_queue = False
+    def _toggle_show_all_queue(self):
+        self._show_all_queue = not self._show_all_queue
         self._queue_display.refresh()
 
     def _build_update_timer(self):

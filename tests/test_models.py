@@ -3,9 +3,27 @@ from models import (
     PlaybackState,
     search_queue,
     filter_queue_with_positions,
+    format_queue_stats,
     select_album_art,
 )
 import pytest
+
+
+def test_format_queue_stats_with_durations():
+    queue = [
+        QueueItem("A", "x", "", "g", "spotify:track:a", duration_ms=60_000),
+        QueueItem("B", "x", "", "g", "spotify:track:b", duration_ms=60_000),
+    ]
+    stats = format_queue_stats(queue)
+    pytest.assume("2 songs" in stats)
+    pytest.assume("2m 0s remaining" in stats)
+
+
+def test_format_queue_stats_without_durations_omits_time():
+    queue = [QueueItem("A", "x", "", "g", "spotify:track:a")]
+    stats = format_queue_stats(queue)
+    pytest.assume("1 songs" in stats)
+    pytest.assume("remaining" not in stats)
 
 
 def _img(url, width):

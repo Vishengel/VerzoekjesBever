@@ -114,6 +114,11 @@ class QueueMatch:
     now_playing: bool
 
 
+def _matches(item: QueueItem, needle: str) -> bool:
+    """Case-insensitive substring test over an item's track, artist, requester."""
+    return needle in f"{item.track_name} {item.artist} {item.requester or ''}".lower()
+
+
 def search_queue(
     queue: list[QueueItem],
     current: QueueItem | None,
@@ -131,17 +136,13 @@ def search_queue(
     if not needle:
         return []
 
-    def matches(item: QueueItem) -> bool:
-        haystack = f"{item.track_name} {item.artist} {item.requester or ''}".lower()
-        return needle in haystack
-
     results: list[QueueMatch] = []
-    if current is not None and matches(current):
+    if current is not None and _matches(current, needle):
         results.append(QueueMatch(item=current, position=0, eta_ms=0, now_playing=True))
 
     eta_ms = 0
     for index, item in enumerate(queue):
-        if matches(item):
+        if _matches(item, needle):
             results.append(
                 QueueMatch(
                     item=item,
@@ -181,12 +182,7 @@ def filter_queue_with_positions(
         eta_ms += item.duration_ms
     if not needle:
         return positioned
-    return [
-        p
-        for p in positioned
-        if needle
-        in f"{p.item.track_name} {p.item.artist} {p.item.requester or ''}".lower()
-    ]
+    return [p for p in positioned if _matches(p.item, needle)]
 
 
 def format_queue_duration(total_ms: int) -> str:
@@ -196,3 +192,12 @@ def format_queue_duration(total_ms: int) -> str:
     if hours:
         return f"{hours}h {minutes}m"
     return f"{minutes}m {seconds}s"
+
+
+def format_queue_stats(queue: list[QueueItem]) -> str:
+    """One-line queue summary: song count plus total remaining time when known."""
+    total_ms = sum(item.duration_ms for item in queue)
+    stats = f"⏱ {len(queue)} songs"
+    if total_ms:
+        stats += f" · {format_queue_duration(total_ms)} remaining"
+    return stats

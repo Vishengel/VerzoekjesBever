@@ -7,7 +7,12 @@ import segno
 from nicegui import ui
 
 from deps import get_service
-from models import PartyEventType, format_queue_duration, search_queue
+from models import (
+    PartyEventType,
+    format_queue_duration,
+    format_queue_stats,
+    search_queue,
+)
 
 QUEUE_WINDOW = 30
 
@@ -103,11 +108,7 @@ def audience_page():
                     ui.label("UP NEXT").classes(
                         "text-sm font-bold tracking-[0.2em] text-green-400/70"
                     )
-                    total_ms = sum(item.duration_ms for item in queue)
-                    stats = f"⏱ {len(queue)} songs"
-                    if total_ms:
-                        stats += f" · {format_queue_duration(total_ms)} remaining"
-                    ui.label(stats).classes(
+                    ui.label(format_queue_stats(queue)).classes(
                         "text-base font-semibold text-green-300/80 "
                         "bg-white/5 rounded-full px-4 py-1"
                     )
@@ -306,7 +307,8 @@ def audience_page():
 
             playlist_display.refresh()
             qr_overlay.refresh()
-            search_results.refresh()
+            if (search_input.value or "").strip():
+                search_results.refresh()
 
             if pending_add["uri"]:
                 is_priority = any(
