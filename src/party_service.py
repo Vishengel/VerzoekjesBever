@@ -77,7 +77,7 @@ class PartyService:
         self._adem = AdemMode(store)
         self._version: int = 0
         self._events: list[PartyEvent] = []
-        self._beaver_enabled: bool = False
+        self._beaver_enabled: bool = True
         self._show_qr_code: bool = False
         self._playback_commanded_at: float = 0.0
 

@@ -282,8 +282,8 @@ def test_poll_track_end_does_not_emit_skipped(service, mock_spotify):
     pytest.assume(len(skipped) == 0)
 
 
-def test_beaver_enabled_default_false(service):
-    pytest.assume(service.beaver_enabled is False)
+def test_beaver_enabled_default_true(service):
+    pytest.assume(service.beaver_enabled is True)
 
 
 def test_set_beaver_enabled(service):
