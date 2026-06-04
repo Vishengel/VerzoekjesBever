@@ -1,4 +1,9 @@
-from models import QueueItem, PlaybackState, search_queue
+from models import (
+    QueueItem,
+    PlaybackState,
+    search_queue,
+    filter_queue_with_positions,
+)
 import pytest
 
 
@@ -171,3 +176,60 @@ def test_search_queue_multiple_matches_in_queue_order():
     ]
     matches = search_queue(queue, None, "toto")
     pytest.assume([m.position for m in matches] == [1, 3])
+
+
+def test_filter_queue_no_term_returns_all_with_positions():
+    queue = [_item(track_name="A"), _item(track_name="B"), _item(track_name="C")]
+    result = filter_queue_with_positions(queue, "")
+    pytest.assume(len(result) == 3)
+    pytest.assume([p.position for p in result] == [1, 2, 3])
+    pytest.assume(result[0].item.track_name == "A")
+
+
+def test_filter_queue_keeps_real_positions():
+    # Matches at queue index 2 and 6 -> real positions 3 and 7.
+    queue = [
+        _item(track_name="Nope 1"),
+        _item(track_name="Nope 2"),
+        _item(track_name="Toto Hit", artist="Toto"),
+        _item(track_name="Nope 3"),
+        _item(track_name="Nope 4"),
+        _item(track_name="Nope 5"),
+        _item(track_name="Africa", artist="Toto"),
+    ]
+    result = filter_queue_with_positions(queue, "toto")
+    pytest.assume([p.position for p in result] == [3, 7])
+    pytest.assume(result[0].item.track_name == "Toto Hit")
+    pytest.assume(result[1].item.track_name == "Africa")
+
+
+def test_filter_queue_eta_sums_songs_ahead():
+    queue = [
+        _item(track_name="A", duration_ms=100_000),
+        _item(track_name="B", duration_ms=200_000),
+        _item(track_name="C", duration_ms=300_000),
+    ]
+    result = filter_queue_with_positions(queue, "")
+    # ETA = sum of durations strictly ahead of each item.
+    pytest.assume([p.eta_ms for p in result] == [0, 100_000, 300_000])
+
+
+def test_filter_queue_case_insensitive_and_fields():
+    queue = [
+        _item(track_name="Africa", artist="Toto", requester="Gralg de Onsterfelijke"),
+        _item(track_name="Hey Jude", artist="The Beatles", requester="Sam"),
+    ]
+    pytest.assume(len(filter_queue_with_positions(queue, "AFRICA")) == 1)
+    pytest.assume(len(filter_queue_with_positions(queue, "beatles")) == 1)
+    by_requester = filter_queue_with_positions(queue, "gralg")
+    pytest.assume(len(by_requester) == 1 and by_requester[0].position == 1)
+
+
+def test_filter_queue_no_match():
+    queue = [_item(track_name="Africa", artist="Toto")]
+    pytest.assume(filter_queue_with_positions(queue, "zzzz") == [])
+
+
+def test_filter_queue_whitespace_term_returns_all():
+    queue = [_item(track_name="A"), _item(track_name="B")]
+    pytest.assume(len(filter_queue_with_positions(queue, "   ")) == 2)

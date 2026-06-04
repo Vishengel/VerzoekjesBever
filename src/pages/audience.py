@@ -233,7 +233,7 @@ def audience_page():
                             )
                         else:
                             eta = format_queue_duration(match.eta_ms)
-                            ui.label(f"#{match.position} · ~{eta}").classes(
+                            ui.label(f"#{match.position} · ETA {eta}").classes(
                                 "text-green-300 font-semibold whitespace-nowrap"
                             )
 

@@ -4,8 +4,15 @@ from nicegui import app, ui
 
 from config import CONFIG
 from deps import get_service
-from models import PlaybackState, QueueItem, format_queue_duration
+from models import (
+    PlaybackState,
+    QueueItem,
+    filter_queue_with_positions,
+    format_queue_duration,
+)
 from party_service import PartyService
+
+DJ_QUEUE_WINDOW = 50
 
 
 @ui.page("/dj", title="VerzoekjesBever - DJ", dark=True)
@@ -31,6 +38,7 @@ class DJPage:
         self._queue_display = None
         self._playback_controls = None
         self._queue_filter: str = ""
+        self._show_all_queue: bool = False
 
     def build(self):
         with ui.row().classes("w-full h-screen gap-0"):
@@ -270,11 +278,31 @@ class DJPage:
             ui.label("No songs in queue yet").classes("text-gray-500 italic")
             return
 
-        filtered = self._apply_queue_filter(queue)
+        filtered = filter_queue_with_positions(queue, self._queue_filter)
         if self._queue_filter and not filtered:
             ui.label("No matching songs").classes("text-gray-500 italic")
-        for i, item in enumerate(filtered):
-            self._render_queue_item(i, item, len(filtered))
+
+        windowed = self._show_all_queue or len(filtered) <= DJ_QUEUE_WINDOW
+        visible = filtered if windowed else filtered[:DJ_QUEUE_WINDOW]
+        for positioned in visible:
+            self._render_queue_item(
+                positioned.position - 1,
+                positioned.item,
+                len(queue),
+                positioned.eta_ms,
+            )
+
+        hidden = len(filtered) - len(visible)
+        if hidden > 0:
+            ui.button(
+                f"Show all {len(filtered)} songs (+{hidden} hidden)",
+                on_click=self._show_all_queue_items,
+            ).props("flat dense color=primary size=sm").classes("w-full mt-1")
+        elif self._show_all_queue and len(filtered) > DJ_QUEUE_WINDOW:
+            ui.button(
+                "Show less",
+                on_click=self._show_fewer_queue_items,
+            ).props("flat dense color=grey size=sm").classes("w-full mt-1")
 
     def _render_now_playing(self, current: QueueItem):
         with ui.card().classes("w-full bg-gray-900 border-2 border-green-500"):
@@ -301,12 +329,23 @@ class DJPage:
                             ),
                         ).props("flat round dense size=xs color=orange")
 
-    def _render_queue_item(self, index: int, item: QueueItem, queue_len: int):
+    def _render_queue_item(
+        self, index: int, item: QueueItem, queue_len: int, eta_ms: int
+    ):
         with ui.card().classes("w-full bg-gray-900"):
             with ui.row().classes("items-center gap-3"):
-                ui.label(str(index + 1)).classes(
-                    "text-gray-500 font-bold w-6 text-center"
-                )
+                with ui.column().classes("items-center gap-0 w-12"):
+                    ui.label(str(index + 1)).classes(
+                        "text-gray-500 font-bold text-center"
+                    )
+                    eta_text = (
+                        "Up next!"
+                        if eta_ms == 0
+                        else f"ETA {format_queue_duration(eta_ms)}"
+                    )
+                    ui.label(eta_text).classes(
+                        "text-[10px] text-green-400/70 text-center leading-tight"
+                    )
                 if item.album_art_url:
                     ui.image(item.album_art_url).classes("w-10 h-10 rounded")
                 with ui.column().classes("flex-grow gap-0"):
@@ -364,17 +403,13 @@ class DJPage:
         self._queue_filter = e.value or ""
         self._queue_display.refresh()
 
-    def _apply_queue_filter(self, queue: list[QueueItem]) -> list[QueueItem]:
-        if not self._queue_filter:
-            return queue
-        term = self._queue_filter.lower()
-        return [
-            item
-            for item in queue
-            if term in item.track_name.lower()
-            or term in item.artist.lower()
-            or term in item.requester.lower()
-        ]
+    def _show_all_queue_items(self):
+        self._show_all_queue = True
+        self._queue_display.refresh()
+
+    def _show_fewer_queue_items(self):
+        self._show_all_queue = False
+        self._queue_display.refresh()
 
     def _build_update_timer(self):
         local_version = {"v": self.svc.version}

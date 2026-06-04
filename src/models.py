@@ -125,6 +125,41 @@ def search_queue(
     return results
 
 
+@dataclass(frozen=True)
+class PositionedItem:
+    item: QueueItem
+    position: int  # 1-based position in the full queue
+    eta_ms: int  # ms until it plays (sum of durations ahead; current treated as done)
+
+
+def filter_queue_with_positions(
+    queue: list[QueueItem],
+    term: str,
+) -> list[PositionedItem]:
+    """Filter the queue by a free-text term, keeping each match's real position.
+
+    Case-insensitive substring over track_name + artist + requester. Each result
+    carries its 1-based position in the *full* queue and a rough ETA (sum of
+    durations of the songs ahead of it), so a filtered view can show the actual
+    position and wait time regardless of which items are hidden. An empty or
+    whitespace-only term returns every item.
+    """
+    needle = term.strip().lower()
+    positioned: list[PositionedItem] = []
+    eta_ms = 0
+    for index, item in enumerate(queue):
+        positioned.append(PositionedItem(item=item, position=index + 1, eta_ms=eta_ms))
+        eta_ms += item.duration_ms
+    if not needle:
+        return positioned
+    return [
+        p
+        for p in positioned
+        if needle
+        in f"{p.item.track_name} {p.item.artist} {p.item.requester or ''}".lower()
+    ]
+
+
 def format_queue_duration(total_ms: int) -> str:
     total_seconds = total_ms // 1000
     hours, remainder = divmod(total_seconds, 3600)
