@@ -1,7 +1,7 @@
 import pytest
 
 from models import QueueItem
-from pages.audience import AudienceRowVM, audience_row_vms  # noqa: F401
+from pages.audience import AudienceRowVM, audience_row_vms
 
 
 def _item(uid, uri="spotify:track:x", req="", dur=60000):
@@ -20,6 +20,7 @@ def _item(uid, uri="spotify:track:x", req="", dur=60000):
 def test_positions_and_eta_accumulate():
     q = [_item("a", dur=60000), _item("b", dur=90000)]
     vms = audience_row_vms(q, window=30, pending_add_uri=None, pending_glow_uri=None)
+    pytest.assume(isinstance(vms[0], AudienceRowVM))
     pytest.assume([v.uid for v in vms] == ["a", "b"])
     pytest.assume(vms[0].position == 1 and vms[0].eta_ms == 0)
     pytest.assume(vms[1].position == 2 and vms[1].eta_ms == 60000)
