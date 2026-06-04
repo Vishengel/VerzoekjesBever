@@ -448,3 +448,19 @@ def test_render_skip_message_ignores_stray_braces():
         artist="Toto",
     )
     pytest.assume(msg == "100% {sure}: Jelle hates Toto")
+
+
+def test_party_event_message_defaults_none_and_paid_skip_exists():
+    from models import PartyEvent, PartyEventType
+
+    e = PartyEvent(kind=PartyEventType.SKIPPED, track_uri="spotify:track:x", version=1)
+    pytest.assume(e.message is None)
+
+    paid = PartyEvent(
+        kind=PartyEventType.PAID_SKIP,
+        track_uri="spotify:track:y",
+        version=2,
+        message="Sorry 🦫, Jelle hates Toto",
+    )
+    pytest.assume(paid.kind == "paid_skip")
+    pytest.assume(paid.message == "Sorry 🦫, Jelle hates Toto")

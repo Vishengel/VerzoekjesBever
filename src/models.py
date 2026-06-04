@@ -24,6 +24,7 @@ class PartyEventType(StrEnum):
     ADDED = "added"
     SKIPPED = "skipped"
     MOVED_TO_TOP = "moved_to_top"
+    PAID_SKIP = "paid_skip"
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,7 @@ class PartyEvent:
     track_uri: str
     version: int
     is_priority: bool = False
+    message: str | None = None
 
 
 @dataclass(frozen=True)
