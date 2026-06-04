@@ -1,5 +1,4 @@
 import asyncio
-import contextlib
 import io
 import socket
 from dataclasses import dataclass
@@ -8,12 +7,12 @@ import segno
 from nicegui import ui
 
 from deps import get_service
+from keyed_list import KeyedList
 from models import (
     PartyEventType,
     filter_queue_with_positions,
     format_queue_duration,
     format_queue_stats,
-    queue_render_signature,
     search_queue,
 )
 
@@ -118,121 +117,165 @@ def audience_page():
         pending_add = {"uri": None}
         pending_glow = {"uri": None}
 
-        @ui.refreshable
-        def playlist_display():
+        # --- now-playing (gated rebuild) ---
+        np_container = ui.column().classes("w-full gap-0")
+        np_state = {"sig": object()}  # sentinel forces first render
+
+        def render_now_playing():
             current = svc.get_currently_playing()
-
-            if current:
-                with ui.element("div").classes("now-playing-wrapper w-full"):
-                    with ui.card().classes(
-                        "w-full bg-green-600 rounded-xl p-5 now-playing-card"
-                    ):
-                        ui.label("NOW PLAYING").classes(
-                            "text-xs tracking-[0.2em] text-white/70"
-                        )
-                        with ui.row().classes("items-center gap-5 mt-2"):
-                            if current.album_art_url:
-                                ui.image(current.album_art_url).classes(
-                                    "w-20 h-20 rounded-lg"
-                                )
-                            with ui.column().classes("gap-0"):
-                                ui.label(current.track_name).classes(
-                                    "text-2xl font-extrabold text-white"
-                                )
-                                ui.label(current.artist).classes(
-                                    "text-lg text-white/85"
-                                )
-                                if current.requester:
-                                    ui.label(
-                                        f"🎤 Requested by {current.requester}"
-                                    ).classes("text-sm text-white/60 mt-1")
-            else:
-                with ui.card().classes("w-full bg-gray-800 rounded-xl p-8 text-center"):
-                    ui.image("/static/beaver.svg").classes("w-10 h-10 mx-auto")
-                    ui.label("No song playing yet").classes(
-                        "text-xl text-gray-400 mt-2"
-                    )
-                    ui.label("Make a request!").classes("text-gray-500")
-
-            queue = svc.get_queue()
-            if queue:
-                with ui.row().classes("items-center justify-between mt-4 w-full"):
-                    ui.label("UP NEXT").classes(
-                        "text-sm font-bold tracking-[0.2em] text-green-400/70"
-                    )
-                    ui.label(format_queue_stats(queue)).classes(
-                        "text-base font-semibold text-green-300/80 "
-                        "bg-white/5 rounded-full px-4 py-1"
-                    )
-                with ui.card().classes("w-full bg-white/5 rounded-xl p-1"):
-                    visible = filter_queue_with_positions(queue, "")[:QUEUE_WINDOW]
-                    for i, positioned in enumerate(visible):
-                        item = positioned.item
-                        border = (
-                            "border-b border-white/5" if i < len(visible) - 1 else ""
-                        )
-                        is_target = (
-                            pending_add["uri"] and item.track_uri == pending_add["uri"]
-                        )
-                        is_glow = (
-                            not is_target
-                            and pending_glow["uri"]
-                            and item.track_uri == pending_glow["uri"]
-                        )
-
-                        container = (
-                            ui.element("div").classes("queue-add-target")
-                            if is_target
-                            else contextlib.nullcontext()
-                        )
-
-                        with container:
-                            row_classes = (
-                                f"items-center gap-3 px-4 py-3 w-full {border}"
+            sig = (current.uid, current.requester) if current else None
+            if sig == np_state["sig"]:
+                return
+            np_state["sig"] = sig
+            np_container.clear()
+            with np_container:
+                if current:
+                    with ui.element("div").classes("now-playing-wrapper w-full"):
+                        with ui.card().classes(
+                            "w-full bg-green-600 rounded-xl p-5 now-playing-card"
+                        ):
+                            ui.label("NOW PLAYING").classes(
+                                "text-xs tracking-[0.2em] text-white/70"
                             )
-                            if is_target:
-                                row_classes += " beaver-incoming"
-                            if is_glow:
-                                row_classes += " priority-glow-target"
-                            with ui.row().classes(row_classes):
-                                ui.label(str(i + 1)).classes(
-                                    "text-green-400 font-extrabold text-lg w-7 text-center"
-                                )
-                                if item.thumb_url:
-                                    ui.image(item.thumb_url).classes(
-                                        "w-11 h-11 rounded-md"
+                            with ui.row().classes("items-center gap-5 mt-2"):
+                                if current.album_art_url:
+                                    ui.image(current.album_art_url).classes(
+                                        "w-20 h-20 rounded-lg"
                                     )
-                                with ui.column().classes("flex-grow gap-0"):
-                                    ui.label(item.track_name).classes(
-                                        "text-white font-semibold text-base"
+                                with ui.column().classes("gap-0"):
+                                    ui.label(current.track_name).classes(
+                                        "text-2xl font-extrabold text-white"
                                     )
-                                    ui.label(item.artist).classes(
-                                        "text-gray-400 text-sm"
+                                    ui.label(current.artist).classes(
+                                        "text-lg text-white/85"
                                     )
-                                    if item.requester:
-                                        ui.label(f"🎤 {item.requester}").classes(
-                                            "text-orange-400 text-xs mt-0.5"
-                                        )
-                                if positioned.eta_ms == 0:
-                                    ui.label("Up next").classes(
-                                        "text-green-400 font-bold text-sm "
-                                        "whitespace-nowrap ml-auto bg-white/5 "
-                                        "rounded-full px-3 py-1 w-28 text-center"
-                                    )
-                                else:
-                                    eta = format_queue_duration(positioned.eta_ms)
-                                    ui.label(f"ETA {eta}").classes(
-                                        "text-green-300/70 font-semibold text-sm "
-                                        "whitespace-nowrap ml-auto bg-white/5 "
-                                        "rounded-full px-3 py-1 w-28 text-center"
-                                    )
-                    hidden = len(queue) - len(visible)
-                    if hidden > 0:
-                        ui.label(
-                            f"+ {hidden} more song{'s' if hidden != 1 else ''}"
-                        ).classes("text-center text-gray-500 text-sm py-2")
+                                    if current.requester:
+                                        ui.label(
+                                            f"🎤 Requested by {current.requester}"
+                                        ).classes("text-sm text-white/60 mt-1")
+                else:
+                    with ui.card().classes(
+                        "w-full bg-gray-800 rounded-xl p-8 text-center"
+                    ):
+                        ui.image("/static/beaver.svg").classes("w-10 h-10 mx-auto")
+                        ui.label("No song playing yet").classes(
+                            "text-xl text-gray-400 mt-2"
+                        )
+                        ui.label("Make a request!").classes("text-gray-500")
 
-        playlist_display()
+        # --- UP NEXT header (patched) ---
+        header_row = ui.row().classes("items-center justify-between mt-4 w-full")
+        with header_row:
+            ui.label("UP NEXT").classes(
+                "text-sm font-bold tracking-[0.2em] text-green-400/70"
+            )
+            stats_label = ui.label("").classes(
+                "text-base font-semibold text-green-300/80 "
+                "bg-white/5 rounded-full px-4 py-1"
+            )
+
+        # --- queue list (KeyedList) ---
+        queue_card = ui.card().classes("w-full bg-white/5 rounded-xl p-1")
+        with queue_card:
+            list_container = ui.column().classes("w-full gap-0")
+            more_label = ui.label("").classes("text-center text-gray-500 text-sm py-2")
+
+        BASE_ROW = "items-center gap-3 px-4 py-3 w-full"
+        ETA_NEXT = (
+            "text-green-400 font-bold text-sm whitespace-nowrap ml-auto "
+            "bg-white/5 rounded-full px-3 py-1 w-28 text-center"
+        )
+        ETA_WAIT = (
+            "text-green-300/70 font-semibold text-sm whitespace-nowrap ml-auto "
+            "bg-white/5 rounded-full px-3 py-1 w-28 text-center"
+        )
+
+        @dataclass
+        class _AudRow:
+            root: object  # wrapper div; toggles .queue-add-target
+            row: object  # inner row; toggles .beaver-incoming / .priority-glow-target / border
+            pos: object
+            requester: object
+            eta: object
+
+        def _patch_row(h, vm: AudienceRowVM) -> None:
+            if h.pos.text != str(vm.position):
+                h.pos.set_text(str(vm.position))
+            req_text = f"🎤 {vm.requester}" if vm.requester else ""
+            if h.requester.text != req_text:
+                h.requester.set_text(req_text)
+            h.requester.set_visibility(bool(vm.requester))
+            if vm.eta_ms == 0:
+                eta_text, eta_cls = "Up next", ETA_NEXT
+            else:
+                eta_text, eta_cls = f"ETA {format_queue_duration(vm.eta_ms)}", ETA_WAIT
+            if h.eta.text != eta_text:
+                h.eta.set_text(eta_text)
+            h.eta.classes(replace=eta_cls)
+            row_cls = BASE_ROW + ("" if vm.is_last else " border-b border-white/5")
+            if vm.is_target:
+                row_cls += " beaver-incoming"
+            if vm.is_glow:
+                row_cls += " priority-glow-target"
+            h.row.classes(replace=row_cls)
+            h.root.classes(
+                replace="w-full queue-add-target" if vm.is_target else "w-full"
+            )
+
+        def _build_row(vm: AudienceRowVM) -> _AudRow:
+            wrapper = ui.element("div").classes("w-full")
+            with wrapper:
+                row = ui.row().classes(BASE_ROW)
+                with row:
+                    pos = ui.label(str(vm.position)).classes(
+                        "text-green-400 font-extrabold text-lg w-7 text-center"
+                    )
+                    if vm.thumb_url:
+                        ui.image(vm.thumb_url).classes("w-11 h-11 rounded-md")
+                    with ui.column().classes("flex-grow gap-0"):
+                        ui.label(vm.track_name).classes(
+                            "text-white font-semibold text-base"
+                        )
+                        ui.label(vm.artist).classes("text-gray-400 text-sm")
+                        requester = ui.label("").classes(
+                            "text-orange-400 text-xs mt-0.5"
+                        )
+                    eta = ui.label("").classes(ETA_WAIT)
+            handle = _AudRow(
+                root=wrapper, row=row, pos=pos, requester=requester, eta=eta
+            )
+            _patch_row(handle, vm)
+            return handle
+
+        queue_list = KeyedList(
+            list_container,
+            key=lambda vm: vm.uid,
+            build=_build_row,
+            patch=_patch_row,
+        )
+
+        def render_queue():
+            queue = svc.get_queue()
+            stats_label.set_text(format_queue_stats(queue) if queue else "")
+            header_row.set_visibility(bool(queue))
+            queue_card.set_visibility(bool(queue))
+            vms = audience_row_vms(
+                queue,
+                window=QUEUE_WINDOW,
+                pending_add_uri=pending_add["uri"],
+                pending_glow_uri=pending_glow["uri"],
+            )
+            queue_list.reconcile(vms)
+            hidden = len(queue) - len(vms)
+            more_label.set_visibility(hidden > 0)
+            if hidden > 0:
+                more_label.set_text(f"+ {hidden} more song{'s' if hidden != 1 else ''}")
+
+        def render_all():
+            render_now_playing()
+            render_queue()
+
+        render_all()
 
         display_url = f"http://{_get_local_ip()}:8000/display"
         qr_svg = _generate_qr_svg(display_url)
@@ -348,24 +391,10 @@ def audience_page():
         )
 
         local_version = {"v": svc.version}
-        render_sig = {"v": None}
-
-        def _current_signature():
-            queue = svc.get_queue()
-            total_ms = sum(item.duration_ms for item in queue)
-            return queue_render_signature(
-                svc.get_currently_playing(),
-                queue[:QUEUE_WINDOW],
-                len(queue),
-                total_ms,
-            )
-
-        render_sig["v"] = _current_signature()
 
         async def check_updates():
             if svc.version == local_version["v"]:
                 return
-
             events = svc.get_events_since(local_version["v"])
             local_version["v"] = svc.version
 
@@ -373,10 +402,8 @@ def audience_page():
                 if event.kind == PartyEventType.SKIPPED and svc.beaver_enabled:
                     await ui.run_javascript("triggerBeaverAnimation()")
                     await asyncio.sleep(2.2)
-
                 if event.kind == PartyEventType.ADDED and svc.beaver_enabled:
                     pending_add["uri"] = event.track_uri
-
                 if event.kind == PartyEventType.MOVED_TO_TOP:
                     pending_glow["uri"] = event.track_uri
                 elif (
@@ -386,10 +413,7 @@ def audience_page():
                 ):
                     pending_glow["uri"] = event.track_uri
 
-            sig = _current_signature()
-            if sig != render_sig["v"]:
-                render_sig["v"] = sig
-                playlist_display.refresh()
+            render_all()
             qr_overlay.refresh()
             if (search_input.value or "").strip():
                 search_results.refresh()
@@ -403,10 +427,12 @@ def audience_page():
                 )
                 await asyncio.sleep(3.5 if is_priority else 2.4)
                 pending_add["uri"] = None
+                render_queue()  # clear the incoming class now the animation is done
 
             if pending_glow["uri"]:
                 await ui.run_javascript("triggerPriorityGlow()")
                 await asyncio.sleep(2.0)
                 pending_glow["uri"] = None
+                render_queue()
 
         ui.timer(1.0, check_updates)
