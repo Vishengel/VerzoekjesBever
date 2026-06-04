@@ -273,7 +273,7 @@ def audience_page():
             ui.label(
                 "This screen shows what's playing now and what's coming up next."
             ).classes("text-gray-300 text-sm")
-            ui.label("Only the DJ adds songs — go ask them for your request!").classes(
+            ui.label("Only the DJ adds songs. Go ask them for your request!").classes(
                 "text-gray-300 text-sm"
             )
             ui.label(
