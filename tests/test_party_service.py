@@ -419,6 +419,14 @@ def test_update_requester(service):
     pytest.assume(service.version > v)
 
 
+def test_get_requester_by_uid(service, store):
+    item = _make_item(uri="spotify:track:gr", requester="Bob")
+    store.add_to_queue(item)
+    uid = store.queue[0].uid
+    pytest.assume(service.get_requester(uid) == "Bob")
+    pytest.assume(service.get_requester("nope") == "")
+
+
 def test_get_known_requesters(service):
     service.start_session("Party", "dev1")
     service.add_to_queue(_make_item("S1", uri="spotify:track:s1", requester="Alice"))

@@ -266,6 +266,13 @@ class PartyService:
         self._store.update_requester(uid, requester)
         self._bump_version()
 
+    def get_requester(self, uid: str) -> str:
+        current = self._store.currently_playing
+        if current and current.uid == uid:
+            return current.requester or ""
+        item = next((q for q in self._store.queue if q.uid == uid), None)
+        return (item.requester if item else "") or ""
+
     def get_known_requesters(self) -> list[str]:
         return self._store.get_known_requesters()
 
