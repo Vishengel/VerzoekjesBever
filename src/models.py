@@ -188,6 +188,27 @@ def filter_queue_with_positions(
     return [p for p in positioned if _matches(p.item, needle)]
 
 
+@dataclass(frozen=True)
+class SkipMessageTemplate:
+    text: str
+    uid: str = field(default_factory=lambda: uuid4().hex[:8])
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "SkipMessageTemplate":
+        return cls(text=data["text"], uid=data.get("uid", uuid4().hex[:8]))
+
+
+DEFAULT_SKIP_TEMPLATES: list[str] = [
+    "Sorry {victim}, {skipper} hates {artist}",
+    "{skipper} paid good money to never hear {artist} again. Sorry {victim}.",
+    "Tough luck {victim} — {skipper} just skipped your {artist}.",
+    "{victim}, your {artist} got yeeted by {skipper}.",
+]
+
+
 def format_queue_duration(total_ms: int) -> str:
     total_seconds = total_ms // 1000
     hours, remainder = divmod(total_seconds, 3600)

@@ -195,6 +195,26 @@ def test_queue_item_roundtrip():
     pytest.assume(QueueItem.from_dict(item.to_dict()) == item)
 
 
+def test_skip_message_template_roundtrip():
+    from models import SkipMessageTemplate
+
+    tpl = SkipMessageTemplate(text="Sorry {victim}, {skipper} hates {artist}")
+    pytest.assume(len(tpl.uid) == 8)
+    restored = SkipMessageTemplate.from_dict(tpl.to_dict())
+    pytest.assume(restored.text == tpl.text)
+    pytest.assume(restored.uid == tpl.uid)
+
+
+def test_default_skip_templates_present_and_have_placeholders():
+    from models import DEFAULT_SKIP_TEMPLATES
+
+    pytest.assume(len(DEFAULT_SKIP_TEMPLATES) >= 3)
+    for text in DEFAULT_SKIP_TEMPLATES:
+        pytest.assume("{victim}" in text)
+        pytest.assume("{skipper}" in text)
+        pytest.assume("{artist}" in text)
+
+
 def test_queue_item_from_spotify_track_no_album_art():
     spotify_track = {
         "name": "Some Song",
