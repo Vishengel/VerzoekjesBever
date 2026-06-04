@@ -380,6 +380,7 @@ class DJPage:
 
             self._render_all()
             self._build_update_timer()
+            self._build_skip_messages_panel()
 
     def _render_all(self):
         self._render_now_playing()
@@ -630,6 +631,46 @@ class DJPage:
             self._render_all()
 
         ui.timer(1.0, check_updates)
+
+    def _build_skip_messages_panel(self):
+        with ui.expansion("💬 Skip messages", icon="chat").classes(
+            "w-full bg-gray-900 rounded"
+        ):
+
+            @ui.refreshable
+            def template_list():
+                templates = self.svc.get_skip_templates()
+                if not templates:
+                    ui.label(
+                        "No skip messages — paid skips will skip silently."
+                    ).classes("text-gray-500 italic text-sm")
+                for tpl in templates:
+                    with ui.row().classes("w-full items-center gap-2"):
+                        ui.label(tpl.text).classes("flex-grow text-sm")
+                        ui.button(
+                            icon="delete",
+                            on_click=lambda uid=tpl.uid: (
+                                self.svc.remove_skip_template(uid),
+                                template_list.refresh(),
+                            ),
+                        ).props("flat round dense color=negative size=sm")
+
+            template_list()
+
+            new_input = ui.input(
+                placeholder="New message — use {victim} {skipper} {artist}",
+            ).classes("w-full")
+
+            def add_template():
+                text = new_input.value.strip() if new_input.value else ""
+                if not text:
+                    return
+                self.svc.add_skip_template(text)
+                new_input.set_value("")
+                template_list.refresh()
+
+            new_input.on("keydown.enter", add_template)
+            ui.button("Add message", on_click=add_template).props("color=primary dense")
 
     def _open_edit_requester(self, uid: str):
         current_name = self.svc.get_requester(uid)
