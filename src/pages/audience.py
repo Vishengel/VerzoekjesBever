@@ -249,6 +249,35 @@ def audience_page():
             "position: fixed; bottom: 24px; right: 24px; z-index: 100; opacity: 0.55;"
         )
 
+        with (
+            ui.dialog() as info_dialog,
+            ui.card().classes("w-full max-w-md bg-gray-900 rounded-xl p-5 gap-2"),
+        ):
+            ui.label("🦫 How this works").classes("text-lg font-bold text-white")
+            ui.label(
+                "This screen shows what's playing now and what's coming up next."
+            ).classes("text-gray-300 text-sm")
+            ui.label("Only the DJ adds songs — go ask them for your request!").classes(
+                "text-gray-300 text-sm"
+            )
+            ui.label(
+                f"The list shows the next {QUEUE_WINDOW} songs. "
+                "If there are more, you'll see a '+ N more songs' line."
+            ).classes("text-gray-300 text-sm")
+            ui.label(
+                "Tap 🔍 to find your song and see its position and how long "
+                "until it plays."
+            ).classes("text-gray-300 text-sm")
+            ui.button("Got it", on_click=info_dialog.close).props("flat").classes(
+                "self-end text-gray-400"
+            )
+
+        ui.button(icon="info", on_click=info_dialog.open).props(
+            "round color=grey"
+        ).style(
+            "position: fixed; bottom: 84px; right: 24px; z-index: 100; opacity: 0.45;"
+        )
+
         local_version = {"v": svc.version}
 
         async def check_updates():
