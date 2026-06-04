@@ -1056,3 +1056,20 @@ def test_adem_fill_capped_by_end_time(service, store):
 def test_adem_fill_unlimited_without_end_time(service):
     service.start_session("Party", "dev1", adem_mode=True)
     pytest.assume(len(service.get_queue()) == ADEM_MODE_QUEUE_SIZE)
+
+
+def test_skip_messages_enabled_defaults_on_and_toggles(service):
+    pytest.assume(service.skip_messages_enabled is True)
+    service.set_skip_messages_enabled(False)
+    pytest.assume(service.skip_messages_enabled is False)
+
+
+def test_skip_template_crud_passthrough(service):
+    before = len(service.get_skip_templates())
+    service.add_skip_template("{skipper} can't stand {artist}, sorry {victim}")
+    after = service.get_skip_templates()
+    pytest.assume(len(after) == before + 1)
+
+    target = next(t for t in after if "can't stand" in t.text)
+    service.remove_skip_template(target.uid)
+    pytest.assume(all(t.uid != target.uid for t in service.get_skip_templates()))

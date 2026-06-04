@@ -97,6 +97,7 @@ class PartyService:
         self._events: list[PartyEvent] = []
         self._beaver_enabled: bool = True
         self._show_qr_code: bool = False
+        self._skip_messages_enabled: bool = True
         # Settle period lives in memory: a fresh process must not instantly
         # treat a resumed-but-playing session as a lost track before Spotify
         # has even been polled once. Seed the window when restoring playback.
@@ -150,6 +151,10 @@ class PartyService:
         return self._beaver_enabled
 
     @property
+    def skip_messages_enabled(self) -> bool:
+        return self._skip_messages_enabled
+
+    @property
     def show_qr_code(self) -> bool:
         return self._show_qr_code
 
@@ -168,6 +173,9 @@ class PartyService:
 
     def set_beaver_enabled(self, enabled: bool) -> None:
         self._beaver_enabled = enabled
+
+    def set_skip_messages_enabled(self, enabled: bool) -> None:
+        self._skip_messages_enabled = enabled
 
     def set_show_qr_code(self, enabled: bool) -> None:
         self._show_qr_code = enabled
@@ -317,6 +325,15 @@ class PartyService:
 
     def get_known_requesters(self) -> list[str]:
         return self._store.get_known_requesters()
+
+    def get_skip_templates(self):
+        return self._store.get_skip_templates()
+
+    def add_skip_template(self, text: str) -> None:
+        self._store.add_skip_template(text)
+
+    def remove_skip_template(self, uid: str) -> None:
+        self._store.remove_skip_template(uid)
 
     def get_devices(self) -> list[dict]:
         return self._spotify.get_devices()
