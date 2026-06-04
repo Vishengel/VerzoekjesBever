@@ -150,7 +150,7 @@ class DJPage:
 
     def _render_search_result(self, item: QueueItem):
         with ui.card().classes("w-full bg-gray-800"):
-            with ui.row().classes("items-center gap-3"):
+            with ui.row().classes("items-center gap-3 w-full"):
                 if item.thumb_url:
                     ui.image(item.thumb_url).classes("w-12 h-12 rounded")
                 with ui.column().classes("flex-grow gap-0"):
