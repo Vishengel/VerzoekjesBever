@@ -35,28 +35,35 @@ def dj_row_vms(
     filter_term: str,
     window: int,
     show_all: bool,
-) -> list[DJRowVM]:
+) -> tuple[list[DJRowVM], int]:
     """Pure view-models for the DJ queue rows (filtered + windowed, with ETA).
+
+    Returns ``(vms, filtered_count)`` where ``filtered_count`` is the total number
+    of items matching *filter_term* (before windowing).
 
     ``is_first`` is keyed to the row's *real* queue position (position == 1), so
     button-enabling matches the unfiltered queue, not the visible slice.
     """
     filtered = filter_queue_with_positions(queue, filter_term)
-    visible = filtered if (show_all or len(filtered) <= window) else filtered[:window]
+    filtered_count = len(filtered)
+    visible = filtered if (show_all or filtered_count <= window) else filtered[:window]
     last_real = len(queue)
-    return [
-        DJRowVM(
-            uid=p.item.uid,
-            track_name=p.item.track_name,
-            artist=p.item.artist,
-            requester=p.item.requester or "",
-            position=p.position,
-            eta_ms=p.eta_ms,
-            is_first=p.position == 1,
-            is_last=p.position == last_real,
-        )
-        for p in visible
-    ]
+    return (
+        [
+            DJRowVM(
+                uid=p.item.uid,
+                track_name=p.item.track_name,
+                artist=p.item.artist,
+                requester=p.item.requester or "",
+                position=p.position,
+                eta_ms=p.eta_ms,
+                is_first=p.position == 1,
+                is_last=p.position == last_real,
+            )
+            for p in visible
+        ],
+        filtered_count,
+    )
 
 
 @dataclass
@@ -96,6 +103,16 @@ class DJPage:
         self._playback_controls = None
         self._queue_filter: str = ""
         self._show_all_queue: bool = False
+        self._np_container: ui.column | None = None
+        self._np_sig: object = object()  # sentinel: forces first now-playing render
+        self._stats_label: ui.label | None = None
+        self._clear_btn: ui.button | None = None
+        self._empty_label: ui.label | None = None
+        self._no_match_label: ui.label | None = None
+        self._list_container: ui.column | None = None
+        self._queue_list: KeyedList | None = None
+        self._more_btn: ui.button | None = None
+        self._more_mode: str | None = None  # tracks Show-all/Show-less button state
 
     def build(self):
         with ui.row().classes("w-full h-screen gap-0"):
@@ -251,7 +268,6 @@ class DJPage:
             ).classes("w-full").props("dense clearable outlined")
 
             self._np_container = ui.column().classes("w-full gap-0")
-            self._np_sig = object()
 
             with ui.row().classes("w-full items-center justify-between mt-2"):
                 with ui.row().classes("items-center gap-3"):
@@ -384,13 +400,12 @@ class DJPage:
         self._clear_btn.set_visibility(bool(queue))
         self._empty_label.set_visibility(not queue)
 
-        vms = dj_row_vms(
+        vms, filtered_count = dj_row_vms(
             queue,
             filter_term=self._queue_filter,
             window=DJ_QUEUE_WINDOW,
             show_all=self._show_all_queue,
         )
-        filtered_count = len(filter_queue_with_positions(queue, self._queue_filter))
         self._no_match_label.set_visibility(
             bool(self._queue_filter) and filtered_count == 0
         )
@@ -401,14 +416,19 @@ class DJPage:
             self._more_btn.set_text(
                 f"Show all {filtered_count} songs (+{hidden} hidden)"
             )
-            self._more_btn.props(remove="color=grey", add="color=primary")
+            if self._more_mode != "more":
+                self._more_btn.props(remove="color=grey", add="color=primary")
+                self._more_mode = "more"
             self._more_btn.set_visibility(True)
         elif self._show_all_queue and filtered_count > DJ_QUEUE_WINDOW:
             self._more_btn.set_text("Show less")
-            self._more_btn.props(remove="color=primary", add="color=grey")
+            if self._more_mode != "less":
+                self._more_btn.props(remove="color=primary", add="color=grey")
+                self._more_mode = "less"
             self._more_btn.set_visibility(True)
         else:
             self._more_btn.set_visibility(False)
+            self._more_mode = None
 
     def _build_dj_row(self, vm: DJRowVM) -> _DJRow:
         card = ui.card().classes("w-full bg-gray-900")

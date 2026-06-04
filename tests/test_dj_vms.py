@@ -19,7 +19,8 @@ def _item(uid, req="", dur=60000):
 
 def test_dj_vms_positions_eta_edges():
     q = [_item("a", dur=60000), _item("b", dur=90000), _item("c")]
-    vms = dj_row_vms(q, filter_term="", window=50, show_all=False)
+    vms, total = dj_row_vms(q, filter_term="", window=50, show_all=False)
+    pytest.assume(total == 3)
     pytest.assume(isinstance(vms[0], DJRowVM))
     pytest.assume([v.uid for v in vms] == ["a", "b", "c"])
     pytest.assume(vms[0].position == 1 and vms[0].eta_ms == 0)
@@ -30,5 +31,6 @@ def test_dj_vms_positions_eta_edges():
 
 def test_dj_vms_filter_keeps_real_position():
     q = [_item("a"), _item("b", req="Zed"), _item("c")]
-    vms = dj_row_vms(q, filter_term="zed", window=50, show_all=False)
+    vms, total = dj_row_vms(q, filter_term="zed", window=50, show_all=False)
+    pytest.assume(total == 1)
     pytest.assume(len(vms) == 1 and vms[0].uid == "b" and vms[0].position == 2)
