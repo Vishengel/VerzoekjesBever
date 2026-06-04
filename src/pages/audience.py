@@ -192,13 +192,18 @@ def audience_page():
 
         @dataclass
         class _AudRow:
-            root: object  # wrapper div; toggles .queue-add-target
-            row: object  # inner row; toggles .beaver-incoming / .priority-glow-target / border
-            pos: object
-            requester: object
-            eta: object
+            root: ui.element  # wrapper div; toggles .queue-add-target
+            row: (
+                ui.row
+            )  # inner row; toggles .beaver-incoming / .priority-glow-target / border
+            pos: ui.label
+            requester: ui.label
+            eta: ui.label
+            eta_cls: str = ""
+            row_cls: str = ""
+            root_cls: str = ""
 
-        def _patch_row(h, vm: AudienceRowVM) -> None:
+        def _patch_row(h: _AudRow, vm: AudienceRowVM) -> None:
             if h.pos.text != str(vm.position):
                 h.pos.set_text(str(vm.position))
             req_text = f"🎤 {vm.requester}" if vm.requester else ""
@@ -211,16 +216,21 @@ def audience_page():
                 eta_text, eta_cls = f"ETA {format_queue_duration(vm.eta_ms)}", ETA_WAIT
             if h.eta.text != eta_text:
                 h.eta.set_text(eta_text)
-            h.eta.classes(replace=eta_cls)
+            if h.eta_cls != eta_cls:
+                h.eta.classes(replace=eta_cls)
+                h.eta_cls = eta_cls
             row_cls = BASE_ROW + ("" if vm.is_last else " border-b border-white/5")
             if vm.is_target:
                 row_cls += " beaver-incoming"
             if vm.is_glow:
                 row_cls += " priority-glow-target"
-            h.row.classes(replace=row_cls)
-            h.root.classes(
-                replace="w-full queue-add-target" if vm.is_target else "w-full"
-            )
+            if h.row_cls != row_cls:
+                h.row.classes(replace=row_cls)
+                h.row_cls = row_cls
+            root_cls = "w-full queue-add-target" if vm.is_target else "w-full"
+            if h.root_cls != root_cls:
+                h.root.classes(replace=root_cls)
+                h.root_cls = root_cls
 
         def _build_row(vm: AudienceRowVM) -> _AudRow:
             wrapper = ui.element("div").classes("w-full")
