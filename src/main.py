@@ -30,7 +30,10 @@ async def poll_loop() -> None:
                 await loop.run_in_executor(None, svc.poll_playback)
         except SpotifyException:
             logger.error("Polling error", exc_info=True)
-        await asyncio.sleep(3.0)
+        # Single global loop (not per-client), so this is the only steady
+        # Spotify call source: ~40 req/min, far under the rate limit. Lower
+        # interval = snappier auto-advance at track end.
+        await asyncio.sleep(1.5)
 
 
 def main():
