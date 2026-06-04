@@ -12,6 +12,7 @@ from models import (
     filter_queue_with_positions,
     format_queue_duration,
     format_queue_stats,
+    queue_render_signature,
     search_queue,
 )
 
@@ -294,6 +295,19 @@ def audience_page():
         )
 
         local_version = {"v": svc.version}
+        render_sig = {"v": None}
+
+        def _current_signature():
+            queue = svc.get_queue()
+            total_ms = sum(item.duration_ms for item in queue)
+            return queue_render_signature(
+                svc.get_currently_playing(),
+                queue[:QUEUE_WINDOW],
+                len(queue),
+                total_ms,
+            )
+
+        render_sig["v"] = _current_signature()
 
         async def check_updates():
             if svc.version == local_version["v"]:
@@ -319,7 +333,10 @@ def audience_page():
                 ):
                     pending_glow["uri"] = event.track_uri
 
-            playlist_display.refresh()
+            sig = _current_signature()
+            if sig != render_sig["v"]:
+                render_sig["v"] = sig
+                playlist_display.refresh()
             qr_overlay.refresh()
             if (search_input.value or "").strip():
                 search_results.refresh()

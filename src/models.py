@@ -194,6 +194,28 @@ def format_queue_duration(total_ms: int) -> str:
     return f"{minutes}m {seconds}s"
 
 
+def queue_render_signature(
+    current: QueueItem | None,
+    visible: list[QueueItem],
+    *extra: object,
+) -> tuple:
+    """Cheap equality key for what a queue view currently renders.
+
+    Two renders look identical when the now-playing track (and its editable
+    requester), the ordered visible rows (each uid + requester), and any extra
+    state passed by the caller (playback state, total song count, etc.) all
+    match. Comparing this signature across version bumps lets a client skip the
+    full DOM rebuild when a bump did not change anything it actually shows.
+
+    Only fields that can change for a stable uid (the requester) are included
+    per row; track/artist/art are immutable for a given uid, and row order is
+    captured by the tuple order, so position numbers and ETAs are implied.
+    """
+    head = (current.uid, current.requester) if current else None
+    rows = tuple((item.uid, item.requester) for item in visible)
+    return (head, rows, extra)
+
+
 def format_queue_stats(queue: list[QueueItem]) -> str:
     """One-line queue summary: song count plus total remaining time when known."""
     total_ms = sum(item.duration_ms for item in queue)

@@ -10,6 +10,7 @@ from models import (
     filter_queue_with_positions,
     format_queue_duration,
     format_queue_stats,
+    queue_render_signature,
 )
 from party_service import PartyService
 
@@ -244,6 +245,13 @@ class DJPage:
                 "⏭ Next", on_click=lambda: (self.svc.play_next(), self._refresh_all())
             ).props("color=primary")
 
+    def _windowed_queue(self, queue):
+        """Return (filtered, visible) PositionedItem lists for the current view."""
+        filtered = filter_queue_with_positions(queue, self._queue_filter)
+        if self._show_all_queue or len(filtered) <= DJ_QUEUE_WINDOW:
+            return filtered, filtered
+        return filtered, filtered[:DJ_QUEUE_WINDOW]
+
     def _render_queue(self):
         current = self.svc.get_currently_playing()
         if current:
@@ -275,12 +283,10 @@ class DJPage:
             ui.label("No songs in queue yet").classes("text-gray-500 italic")
             return
 
-        filtered = filter_queue_with_positions(queue, self._queue_filter)
+        filtered, visible = self._windowed_queue(queue)
         if self._queue_filter and not filtered:
             ui.label("No matching songs").classes("text-gray-500 italic")
 
-        show_all = self._show_all_queue or len(filtered) <= DJ_QUEUE_WINDOW
-        visible = filtered if show_all else filtered[:DJ_QUEUE_WINDOW]
         for positioned in visible:
             self._render_queue_item(
                 positioned.position - 1,
@@ -404,13 +410,30 @@ class DJPage:
         self._show_all_queue = not self._show_all_queue
         self._queue_display.refresh()
 
+    def _queue_signature(self):
+        queue = self.svc.get_queue()
+        _, visible = self._windowed_queue(queue)
+        return queue_render_signature(
+            self.svc.get_currently_playing(),
+            [p.item for p in visible],
+            self.svc.playback_state,
+            len(queue),
+        )
+
     def _build_update_timer(self):
         local_version = {"v": self.svc.version}
+        render_sig = {"v": self._queue_signature()}
 
         def check_updates():
-            if self.svc.version != local_version["v"]:
-                local_version["v"] = self.svc.version
-                self._refresh_all()
+            if self.svc.version == local_version["v"]:
+                return
+            local_version["v"] = self.svc.version
+            # Playback controls are cheap and state-driven; always refresh them.
+            self._playback_controls.refresh()
+            sig = self._queue_signature()
+            if sig != render_sig["v"]:
+                render_sig["v"] = sig
+                self._queue_display.refresh()
 
         ui.timer(1.0, check_updates)
 

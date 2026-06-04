@@ -4,9 +4,57 @@ from models import (
     search_queue,
     filter_queue_with_positions,
     format_queue_stats,
+    queue_render_signature,
     select_album_art,
 )
 import pytest
+
+
+def test_render_signature_stable_for_identical_render():
+    a = _item(track_name="A")
+    b = _item(track_name="B")
+    current = _item(track_name="Now")
+    sig1 = queue_render_signature(current, [a, b], "playing", 2)
+    sig2 = queue_render_signature(current, [a, b], "playing", 2)
+    pytest.assume(sig1 == sig2)
+
+
+def test_render_signature_changes_on_reorder():
+    a = _item(track_name="A")
+    b = _item(track_name="B")
+    pytest.assume(
+        queue_render_signature(None, [a, b]) != queue_render_signature(None, [b, a])
+    )
+
+
+def test_render_signature_changes_on_requester_edit():
+    item = _item(track_name="A", requester="Old")
+    edited = QueueItem(
+        track_name="A",
+        artist="Artist",
+        album_art_url="",
+        requester="New",
+        track_uri=item.track_uri,
+        uid=item.uid,
+    )
+    pytest.assume(
+        queue_render_signature(None, [item]) != queue_render_signature(None, [edited])
+    )
+
+
+def test_render_signature_changes_on_extra_state():
+    item = _item(track_name="A")
+    pytest.assume(
+        queue_render_signature(None, [item], "playing")
+        != queue_render_signature(None, [item], "paused")
+    )
+
+
+def test_render_signature_changes_when_now_playing_appears():
+    item = _item(track_name="A")
+    pytest.assume(
+        queue_render_signature(None, [item]) != queue_render_signature(item, [item])
+    )
 
 
 def test_format_queue_stats_with_durations():
