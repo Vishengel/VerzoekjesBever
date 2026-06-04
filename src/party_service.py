@@ -26,6 +26,28 @@ TRACK_END_THRESHOLD_MS = 5000
 PLAYBACK_SETTLE_SECONDS = 5
 
 
+def _is_our_track(info: PlaybackInfo, current_track_uri: str | None) -> bool:
+    return (
+        current_track_uri is not None
+        and info.track_uri is not None
+        and info.track_uri == current_track_uri
+    )
+
+
+def _track_has_ended(info: PlaybackInfo) -> bool:
+    if info.duration_ms <= 0:
+        return False
+    # paused near end (e.g. skipped from another device)
+    paused_near_end = (
+        not info.is_playing
+        and (info.duration_ms - info.progress_ms) < TRACK_END_THRESHOLD_MS
+    )
+    # natural end in isolated playback: Spotify keeps is_playing=True
+    # with progress_ms pegged at duration_ms
+    progress_pegged = info.progress_ms >= info.duration_ms
+    return paused_near_end or progress_pegged
+
+
 def detect_playback_signal(
     info: PlaybackInfo | None,
     current_track_uri: str | None,
@@ -37,27 +59,12 @@ def detect_playback_signal(
             return PlaybackSignal.TRACK_LOST
         return PlaybackSignal.NOTHING
 
-    is_our_track = (
-        current_track_uri is not None
-        and info.track_uri is not None
-        and info.track_uri == current_track_uri
-    )
-    if not is_our_track:
+    if not _is_our_track(info, current_track_uri):
         if in_settle_period:
             return PlaybackSignal.NOTHING
         return PlaybackSignal.TRACK_LOST
 
-    track_ended = info.duration_ms > 0 and (
-        # paused near end (e.g. skipped from another device)
-        (
-            not info.is_playing
-            and (info.duration_ms - info.progress_ms) < TRACK_END_THRESHOLD_MS
-        )
-        # natural end in isolated playback: Spotify keeps is_playing=True
-        # with progress_ms pegged at duration_ms
-        or info.progress_ms >= info.duration_ms
-    )
-    if track_ended:
+    if _track_has_ended(info):
         return PlaybackSignal.TRACK_ENDED
 
     if info.is_playing and our_state == PlaybackState.PAUSED:
