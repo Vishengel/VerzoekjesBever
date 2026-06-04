@@ -17,6 +17,11 @@ class Config(BaseSettings):
 
     queue_store_path: Path = project_root / "data" / "session.json"
 
+    # Seconds between Spotify playback polls. Single global loop, so this is
+    # the only steady API call source regardless of audience size; lower =
+    # snappier auto-advance at track end.
+    playback_poll_interval_s: float = 1.5
+
     model_config = SettingsConfigDict(
         env_file=project_root / ".env",
         env_file_encoding="utf-8",
