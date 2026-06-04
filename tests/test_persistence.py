@@ -387,3 +387,38 @@ def test_party_end_time_corrupt_value_falls_back_to_none(tmp_path: Path):
     path.write_text(json.dumps({"party_end_time": "not-a-date", "queue": []}))
     store = QueueStore(path)
     pytest.assume(store.party_end_time is None)
+
+
+def test_skip_templates_seeded_on_fresh_store(tmp_path):
+    from persistence import QueueStore
+    from models import DEFAULT_SKIP_TEMPLATES
+
+    store = QueueStore(tmp_path / "session.json")
+    texts = [t.text for t in store.get_skip_templates()]
+    pytest.assume(texts == DEFAULT_SKIP_TEMPLATES)
+
+
+def test_skip_templates_add_and_remove(tmp_path):
+    from persistence import QueueStore
+
+    store = QueueStore(tmp_path / "session.json")
+    store.add_skip_template("{skipper} loathes {artist}, sorry {victim}")
+    added = [t for t in store.get_skip_templates() if "loathes" in t.text]
+    pytest.assume(len(added) == 1)
+
+    uid = added[0].uid
+    store.remove_skip_template(uid)
+    pytest.assume(all(t.uid != uid for t in store.get_skip_templates()))
+
+
+def test_skip_templates_persist_and_deletion_not_resurrected(tmp_path):
+    from persistence import QueueStore
+
+    path = tmp_path / "session.json"
+    store = QueueStore(path)
+    for t in list(store.get_skip_templates()):
+        store.remove_skip_template(t.uid)
+    pytest.assume(store.get_skip_templates() == [])
+
+    reloaded = QueueStore(path)
+    pytest.assume(reloaded.get_skip_templates() == [])

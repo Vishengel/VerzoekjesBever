@@ -5,7 +5,7 @@ from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
 
-from models import PlaybackState, QueueItem
+from models import DEFAULT_SKIP_TEMPLATES, PlaybackState, QueueItem, SkipMessageTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,9 @@ class QueueStore:
         self._queue: list[QueueItem] = []
         self._adem_mode_active: bool = False
         self._party_end_time: datetime | None = None
+        self._skip_templates: list[SkipMessageTemplate] = [
+            SkipMessageTemplate(text=t) for t in DEFAULT_SKIP_TEMPLATES
+        ]
         self._load()
 
     @property
@@ -147,6 +150,17 @@ class QueueStore:
                 names.add(item.requester)
         return sorted(names)
 
+    def get_skip_templates(self) -> list[SkipMessageTemplate]:
+        return list(self._skip_templates)
+
+    def add_skip_template(self, text: str) -> None:
+        self._skip_templates.append(SkipMessageTemplate(text=text))
+        self._save()
+
+    def remove_skip_template(self, uid: str) -> None:
+        self._skip_templates = [t for t in self._skip_templates if t.uid != uid]
+        self._save()
+
     def set_adem_mode_active(self, active: bool) -> None:
         self._adem_mode_active = active
         self._save()
@@ -178,6 +192,10 @@ class QueueStore:
         except ValueError:
             logger.warning("Invalid party_end_time in %s, ignoring", self._path)
             self._party_end_time = None
+        if "skip_templates" in data:
+            self._skip_templates = [
+                SkipMessageTemplate.from_dict(t) for t in data["skip_templates"]
+            ]
 
     def _save(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -193,6 +211,7 @@ class QueueStore:
             "party_end_time": self._party_end_time.isoformat()
             if self._party_end_time
             else None,
+            "skip_templates": [t.to_dict() for t in self._skip_templates],
         }
         tmp = self._path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=2))
