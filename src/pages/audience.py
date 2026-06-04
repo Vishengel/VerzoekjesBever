@@ -164,13 +164,13 @@ def audience_page():
                                 if positioned.eta_ms == 0:
                                     ui.label("Up next").classes(
                                         "text-green-400 font-bold text-sm "
-                                        "whitespace-nowrap ml-2"
+                                        "whitespace-nowrap ml-auto"
                                     )
                                 else:
                                     eta = format_queue_duration(positioned.eta_ms)
-                                    ui.label(f"⏱ {eta}").classes(
+                                    ui.label(f"ETA {eta}").classes(
                                         "text-green-300/70 font-semibold text-sm "
-                                        "whitespace-nowrap ml-2 bg-white/5 "
+                                        "whitespace-nowrap ml-auto bg-white/5 "
                                         "rounded-full px-3 py-1"
                                     )
                     hidden = len(queue) - len(visible)
