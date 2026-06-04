@@ -262,6 +262,25 @@ def test_play_next_emits_skipped_event(service, mock_spotify):
     pytest.assume(skipped[0].track_uri == "spotify:track:s1")
 
 
+def test_play_next_play_fails_requeues(service, mock_spotify):
+    """Manual skip but play fails → re-queue, don't lose song, stay idle."""
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
+    mock_spotify.play_track.side_effect = SpotifyException(
+        404, "https://api.spotify.com", msg="Device not found"
+    )
+    v = service.version
+    service.play_next()
+
+    pytest.assume(len(service.get_queue()) == 1)
+    pytest.assume(service.get_queue()[0].track_name == "Song1")
+    pytest.assume(service.get_currently_playing() is None)
+    skipped = [
+        e for e in service.get_events_since(v) if e.kind == PartyEventType.SKIPPED
+    ]
+    pytest.assume(len(skipped) == 0)
+
+
 def test_poll_track_end_does_not_emit_skipped(service, mock_spotify):
     service.start_session("Party", "dev1")
     service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))

@@ -203,16 +203,32 @@ class PartyService:
     def get_currently_playing(self) -> QueueItem | None:
         return self._store.currently_playing
 
+    def _start_track(self, item: QueueItem) -> bool:
+        """Play item, timestamp the command, mark it playing.
+
+        On Spotify failure, re-queue the item at the top and clear current
+        playback so the song is never silently lost. Returns success.
+        """
+        try:
+            self._spotify.play_track(item.track_uri, device_id=self._store.device_id)
+            self._playback_commanded_at = time.monotonic()
+            self._store.set_currently_playing(item, PlaybackState.PLAYING)
+            return True
+        except SpotifyException:
+            logger.warning("Failed to start track, re-queuing")
+            self._store.add_to_queue(item, top=True)
+            self._store.clear_currently_playing()
+            return False
+
     def play_next(self) -> None:
         self._refill_adem_if_needed()
         item = self._store.pop_next()
         if item is None:
             return
-        self._spotify.play_track(item.track_uri, device_id=self._store.device_id)
-        self._playback_commanded_at = time.monotonic()
-        self._store.set_currently_playing(item, PlaybackState.PLAYING)
+        started = self._start_track(item)
         self._bump_version()
-        self._emit(PartyEventType.SKIPPED, item.track_uri)
+        if started:
+            self._emit(PartyEventType.SKIPPED, item.track_uri)
 
     def pause(self) -> None:
         self._spotify.pause(device_id=self._store.device_id)
@@ -287,16 +303,7 @@ class PartyService:
         self._refill_adem_if_needed()
         next_item = self._store.pop_next()
         if next_item:
-            try:
-                self._spotify.play_track(
-                    next_item.track_uri, device_id=self._store.device_id
-                )
-                self._playback_commanded_at = time.monotonic()
-                self._store.set_currently_playing(next_item, PlaybackState.PLAYING)
-            except SpotifyException:
-                logger.warning("Failed to start next track, re-queuing")
-                self._store.add_to_queue(next_item, top=True)
-                self._store.clear_currently_playing()
+            self._start_track(next_item)
         else:
             self._store.clear_currently_playing()
         self._bump_version()
