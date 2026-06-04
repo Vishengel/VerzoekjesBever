@@ -412,3 +412,39 @@ def test_resolve_party_end_exact_now_returns_today():
 def test_resolve_party_end_rejects_malformed():
     with pytest.raises(ValueError):
         resolve_party_end("not-a-time", datetime(2026, 6, 5, 20, 0))
+
+
+def test_render_skip_message_named_victim():
+    from models import render_skip_message
+
+    msg = render_skip_message(
+        "Sorry {victim}, {skipper} hates {artist}",
+        skipper="Jelle",
+        victim="Dorieke",
+        artist="Toto",
+    )
+    pytest.assume(msg == "Sorry Dorieke, Jelle hates Toto")
+
+
+def test_render_skip_message_anonymous_victim():
+    from models import ANONYMOUS_REQUESTER, render_skip_message
+
+    msg = render_skip_message(
+        "Sorry {victim}, {skipper} hates {artist}",
+        skipper="Jelle",
+        victim=ANONYMOUS_REQUESTER,
+        artist="Toto",
+    )
+    pytest.assume(msg == "Sorry 🦫, Jelle hates Toto")
+
+
+def test_render_skip_message_ignores_stray_braces():
+    from models import render_skip_message
+
+    msg = render_skip_message(
+        "100% {sure}: {skipper} hates {artist}",
+        skipper="Jelle",
+        victim="Dorieke",
+        artist="Toto",
+    )
+    pytest.assume(msg == "100% {sure}: Jelle hates Toto")

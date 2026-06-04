@@ -274,3 +274,14 @@ def format_queue_stats(queue: list[QueueItem]) -> str:
     if total_ms:
         stats += f" · {format_queue_duration(total_ms)} remaining"
     return stats
+
+
+def render_skip_message(
+    template_text: str, skipper: str, victim: str, artist: str
+) -> str:
+    display_victim = "🦫" if victim == ANONYMOUS_REQUESTER else victim
+    return (
+        template_text.replace("{victim}", display_victim)
+        .replace("{skipper}", skipper)
+        .replace("{artist}", artist)
+    )
