@@ -34,7 +34,7 @@ def _is_our_track(info: PlaybackInfo, current_track_uri: str | None) -> bool:
     )
 
 
-def _track_has_ended(info: PlaybackInfo) -> bool:
+def _track_has_ended(info: PlaybackInfo, last_progress_ms: int = 0) -> bool:
     if info.duration_ms <= 0:
         return False
     # paused near end (e.g. skipped from another device)
@@ -45,7 +45,14 @@ def _track_has_ended(info: PlaybackInfo) -> bool:
     # natural end in isolated playback: Spotify keeps is_playing=True
     # with progress_ms pegged at duration_ms
     progress_pegged = info.progress_ms >= info.duration_ms
-    return paused_near_end or progress_pegged
+    # some devices instead stop and reset progress_ms to 0 at end; the
+    # instantaneous state then looks like a pause, so fall back to the
+    # furthest progress observed while the track was actually playing.
+    stopped_after_near_end = (
+        not info.is_playing
+        and (info.duration_ms - last_progress_ms) < TRACK_END_THRESHOLD_MS
+    )
+    return paused_near_end or progress_pegged or stopped_after_near_end
 
 
 def detect_playback_signal(
@@ -53,6 +60,7 @@ def detect_playback_signal(
     current_track_uri: str | None,
     our_state: PlaybackState,
     in_settle_period: bool,
+    last_progress_ms: int = 0,
 ) -> PlaybackSignal:
     if info is None:
         if current_track_uri is not None and not in_settle_period:
@@ -64,7 +72,7 @@ def detect_playback_signal(
             return PlaybackSignal.NOTHING
         return PlaybackSignal.TRACK_LOST
 
-    if _track_has_ended(info):
+    if _track_has_ended(info, last_progress_ms):
         return PlaybackSignal.TRACK_ENDED
 
     if info.is_playing and our_state == PlaybackState.PAUSED:
@@ -92,6 +100,10 @@ class PartyService:
         self._playback_commanded_at: float = (
             time.monotonic() if store.currently_playing is not None else 0.0
         )
+        # Furthest progress seen while the current track was playing. Lets us
+        # recognise a track that ended even when the device stops and resets
+        # progress_ms to 0 (which otherwise looks like a pause).
+        self._last_progress_ms: int = 0
 
     @property
     def version(self) -> int:
@@ -217,6 +229,7 @@ class PartyService:
         try:
             self._spotify.play_track(item.track_uri, device_id=self._store.device_id)
             self._playback_commanded_at = time.monotonic()
+            self._last_progress_ms = 0
             self._store.set_currently_playing(item, PlaybackState.PLAYING)
             return True
         except SpotifyException:
@@ -270,19 +283,25 @@ class PartyService:
 
         info = self._spotify.get_playback_state()
         current = self._store.currently_playing
+        current_uri = current.track_uri if current else None
         signal = detect_playback_signal(
             info=info,
-            current_track_uri=current.track_uri if current else None,
+            current_track_uri=current_uri,
             our_state=self._store.playback_state,
             in_settle_period=self._in_settle_period(),
+            last_progress_ms=self._last_progress_ms,
         )
         logger.debug(
-            "poll: info=%s our_state=%s settle=%s -> signal=%s",
+            "poll: info=%s our_state=%s settle=%s high_water=%s -> signal=%s",
             info,
             self._store.playback_state,
             self._in_settle_period(),
+            self._last_progress_ms,
             signal.value,
         )
+        # Track the high-water progress mark while the song is actually playing.
+        if info is not None and info.is_playing and _is_our_track(info, current_uri):
+            self._last_progress_ms = max(self._last_progress_ms, info.progress_ms)
 
         if signal in (PlaybackSignal.TRACK_ENDED, PlaybackSignal.TRACK_LOST):
             logger.info("Advancing queue (%s)", signal.value)

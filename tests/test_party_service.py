@@ -249,6 +249,82 @@ def test_restart_mid_playback_does_not_spuriously_advance(mock_spotify, store):
     mock_spotify.play_track.assert_not_called()
 
 
+def test_detect_stopped_after_near_end_is_track_ended():
+    # Device stops and resets progress to 0 at end; high-water near duration.
+    info = PlaybackInfo(
+        is_playing=False, progress_ms=0, duration_ms=200000, track_uri="u"
+    )
+    signal = detect_playback_signal(
+        info, "u", PlaybackState.PLAYING, False, last_progress_ms=199000
+    )
+    pytest.assume(signal == PlaybackSignal.TRACK_ENDED)
+
+
+def test_detect_stopped_mid_track_is_external_pause():
+    # Same instantaneous state, but high-water is mid-track -> a real pause.
+    info = PlaybackInfo(
+        is_playing=False, progress_ms=0, duration_ms=200000, track_uri="u"
+    )
+    signal = detect_playback_signal(
+        info, "u", PlaybackState.PLAYING, False, last_progress_ms=50000
+    )
+    pytest.assume(signal == PlaybackSignal.EXTERNAL_PAUSE)
+
+
+def test_poll_track_end_with_progress_reset_advances(service, mock_spotify):
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item("Song1", uri="spotify:track:s1"))
+    service.add_to_queue(_make_item("Song2", uri="spotify:track:s2"))
+    service.play_next()  # current = Song1, high-water reset to 0
+
+    # Plays to near the end (records the high-water mark).
+    mock_spotify.get_playback_state.return_value = PlaybackInfo(
+        is_playing=True,
+        progress_ms=133144,
+        duration_ms=133600,
+        track_uri="spotify:track:s1",
+    )
+    service.poll_playback()
+
+    # Device stops and resets progress to 0 -> looks like a pause, but isn't.
+    mock_spotify.get_playback_state.return_value = PlaybackInfo(
+        is_playing=False,
+        progress_ms=0,
+        duration_ms=133600,
+        track_uri="spotify:track:s1",
+    )
+    service.poll_playback()
+
+    pytest.assume(service.get_currently_playing().track_name == "Song2")
+    pytest.assume(service.playback_state == PlaybackState.PLAYING)
+
+
+def test_poll_mid_track_pause_not_treated_as_end(service, mock_spotify):
+    service.start_session("Party", "dev1")
+    service.add_to_queue(_make_item("Song1", uri="spotify:track:s1"))
+    service.add_to_queue(_make_item("Song2", uri="spotify:track:s2"))
+    service.play_next()
+
+    mock_spotify.get_playback_state.return_value = PlaybackInfo(
+        is_playing=True,
+        progress_ms=40000,
+        duration_ms=133600,
+        track_uri="spotify:track:s1",
+    )
+    service.poll_playback()  # high-water = 40000 (mid-track)
+
+    mock_spotify.get_playback_state.return_value = PlaybackInfo(
+        is_playing=False,
+        progress_ms=0,
+        duration_ms=133600,
+        track_uri="spotify:track:s1",
+    )
+    service.poll_playback()
+
+    pytest.assume(service.playback_state == PlaybackState.PAUSED)
+    pytest.assume(service.get_currently_playing().track_name == "Song1")
+
+
 def test_poll_still_playing_no_change(service, mock_spotify):
     service.start_session("Party", "dev1")
     service.add_to_queue(_make_item(requester="Lisa"))
