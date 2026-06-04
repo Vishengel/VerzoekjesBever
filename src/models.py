@@ -206,8 +206,8 @@ class SkipMessageTemplate:
 DEFAULT_SKIP_TEMPLATES: list[str] = [
     "Sorry {victim}, {skipper} hates {artist}",
     "{skipper} paid good money to never hear {artist} again. Sorry {victim}.",
-    "Tough luck {victim} — {skipper} just skipped your {artist}.",
-    "{victim}, your {artist} got yeeted by {skipper}.",
+    "Tough luck {victim}: {skipper} just skipped your {artist}.",
+    "Too bad {victim}, {skipper} thinks {artist} is just really mid :(",
 ]
 
 

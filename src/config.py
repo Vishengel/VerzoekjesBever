@@ -16,6 +16,9 @@ class Config(BaseSettings):
     dj_password: SecretStr = SecretStr("")
 
     queue_store_path: Path = project_root / "data" / "session.json"
+    # Skip-message templates live outside the session: starting a fresh
+    # session (or losing the session file) must not wipe the DJ's messages.
+    skip_templates_path: Path = project_root / "data" / "skip_templates.json"
 
     # Seconds between Spotify playback polls. Single global loop, so this is
     # the only steady API call source regardless of audience size; lower =

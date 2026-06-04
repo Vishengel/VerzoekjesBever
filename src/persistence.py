@@ -20,9 +20,6 @@ class QueueStore:
         self._queue: list[QueueItem] = []
         self._adem_mode_active: bool = False
         self._party_end_time: datetime | None = None
-        self._skip_templates: list[SkipMessageTemplate] = [
-            SkipMessageTemplate(text=t) for t in DEFAULT_SKIP_TEMPLATES
-        ]
         self._load()
 
     @property
@@ -150,17 +147,6 @@ class QueueStore:
                 names.add(item.requester)
         return sorted(names)
 
-    def get_skip_templates(self) -> list[SkipMessageTemplate]:
-        return list(self._skip_templates)
-
-    def add_skip_template(self, text: str) -> None:
-        self._skip_templates.append(SkipMessageTemplate(text=text))
-        self._save()
-
-    def remove_skip_template(self, uid: str) -> None:
-        self._skip_templates = [t for t in self._skip_templates if t.uid != uid]
-        self._save()
-
     def set_adem_mode_active(self, active: bool) -> None:
         self._adem_mode_active = active
         self._save()
@@ -192,10 +178,6 @@ class QueueStore:
         except ValueError:
             logger.warning("Invalid party_end_time in %s, ignoring", self._path)
             self._party_end_time = None
-        if "skip_templates" in data:
-            self._skip_templates = [
-                SkipMessageTemplate.from_dict(t) for t in data["skip_templates"]
-            ]
 
     def _save(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -211,8 +193,56 @@ class QueueStore:
             "party_end_time": self._party_end_time.isoformat()
             if self._party_end_time
             else None,
-            "skip_templates": [t.to_dict() for t in self._skip_templates],
         }
+        tmp = self._path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, indent=2))
+        tmp.replace(self._path)
+
+
+class SkipTemplateStore:
+    """Persists skip-message templates independently of the party session so
+    they outlive session resets. Seeds with defaults on first run."""
+
+    def __init__(self, path: Path):
+        self._path = path
+        self._templates: list[SkipMessageTemplate] = []
+        self._load()
+
+    def get_all(self) -> list[SkipMessageTemplate]:
+        return list(self._templates)
+
+    def add(self, text: str) -> None:
+        self._templates.append(SkipMessageTemplate(text=text))
+        self._save()
+
+    def remove(self, uid: str) -> None:
+        self._templates = [t for t in self._templates if t.uid != uid]
+        self._save()
+
+    def reset_to_default(self) -> None:
+        self._templates = [SkipMessageTemplate(text=t) for t in DEFAULT_SKIP_TEMPLATES]
+        self._save()
+
+    def _load(self) -> None:
+        if not self._path.exists():
+            # First run: seed defaults and persist so the file exists.
+            self.reset_to_default()
+            return
+        try:
+            data = json.loads(self._path.read_text())
+        except (json.JSONDecodeError, ValueError):
+            logger.warning(
+                "Corrupt skip-templates file at %s, restoring defaults", self._path
+            )
+            self.reset_to_default()
+            return
+        self._templates = [
+            SkipMessageTemplate.from_dict(t) for t in data.get("templates", [])
+        ]
+
+    def _save(self) -> None:
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        data = {"templates": [t.to_dict() for t in self._templates]}
         tmp = self._path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=2))
         tmp.replace(self._path)

@@ -14,7 +14,7 @@ from models import (
 )
 from adem_mode import ADEM_MODE_QUEUE_SIZE, ADEMNOOD_ITEM
 from party_service import PartyService, detect_playback_signal
-from persistence import QueueStore
+from persistence import QueueStore, SkipTemplateStore
 
 
 def _make_item(
@@ -40,8 +40,13 @@ def store(tmp_path: Path):
 
 
 @pytest.fixture
-def service(mock_spotify, store):
-    return PartyService(spotify=mock_spotify, store=store)
+def skip_store(tmp_path: Path):
+    return SkipTemplateStore(tmp_path / "skip_templates.json")
+
+
+@pytest.fixture
+def service(mock_spotify, store, skip_store):
+    return PartyService(spotify=mock_spotify, store=store, skip_templates=skip_store)
 
 
 def test_start_session(service, store):
@@ -229,7 +234,9 @@ def test_poll_track_ended_empty_queue_goes_idle(service, mock_spotify):
     pytest.assume(service.get_currently_playing() is None)
 
 
-def test_restart_mid_playback_does_not_spuriously_advance(mock_spotify, store):
+def test_restart_mid_playback_does_not_spuriously_advance(
+    mock_spotify, store, skip_store
+):
     # A session was playing; then the server process restarts (settle period,
     # held only in memory, is lost). Simulate by building a fresh service on a
     # store that already has a playing track.
@@ -239,7 +246,9 @@ def test_restart_mid_playback_does_not_spuriously_advance(mock_spotify, store):
     )
     store.add_to_queue(_make_item("Song2", uri="spotify:track:s2"))
 
-    restarted = PartyService(spotify=mock_spotify, store=store)
+    restarted = PartyService(
+        spotify=mock_spotify, store=store, skip_templates=skip_store
+    )
 
     # First poll after restart: Spotify hasn't reported the track yet.
     mock_spotify.get_playback_state.return_value = None
@@ -523,12 +532,12 @@ def test_get_events_since_filters_by_version(service):
     pytest.assume(events[0].track_uri == "spotify:track:s2")
 
 
-def test_session_persists_across_restart(service, mock_spotify, tmp_path):
+def test_session_persists_across_restart(service, mock_spotify, tmp_path, skip_store):
     service.start_session("Party", "dev1")
     service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
 
     store2 = QueueStore(tmp_path / "session.json")
-    svc2 = PartyService(spotify=mock_spotify, store=store2)
+    svc2 = PartyService(spotify=mock_spotify, store=store2, skip_templates=skip_store)
     pytest.assume(svc2.has_session)
     pytest.assume(len(svc2.get_queue()) == 1)
     pytest.assume(svc2.get_queue()[0].track_name == "Song1")
@@ -778,13 +787,13 @@ def test_adem_refills_after_real_songs_drain(service, mock_spotify):
     )
 
 
-def test_adem_queue_persists_across_restart(mock_spotify, tmp_path):
+def test_adem_queue_persists_across_restart(mock_spotify, tmp_path, skip_store):
     store1 = QueueStore(tmp_path / "session.json")
-    svc1 = PartyService(spotify=mock_spotify, store=store1)
+    svc1 = PartyService(spotify=mock_spotify, store=store1, skip_templates=skip_store)
     svc1.start_session("Party", "dev1", adem_mode=True)
 
     store2 = QueueStore(tmp_path / "session.json")
-    svc2 = PartyService(spotify=mock_spotify, store=store2)
+    svc2 = PartyService(spotify=mock_spotify, store=store2, skip_templates=skip_store)
     pytest.assume(svc2.adem_mode_active is True)
     pytest.assume(len(svc2.get_queue()) == ADEM_MODE_QUEUE_SIZE)
 

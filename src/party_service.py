@@ -20,7 +20,7 @@ from models import (
     render_skip_message,
     resolve_party_end,
 )
-from persistence import QueueStore
+from persistence import QueueStore, SkipTemplateStore
 
 if TYPE_CHECKING:
     from spotify_client import SpotifyClient
@@ -91,9 +91,15 @@ def detect_playback_signal(
 class PartyService:
     MAX_EVENTS = 50
 
-    def __init__(self, spotify: SpotifyClient, store: QueueStore):
+    def __init__(
+        self,
+        spotify: SpotifyClient,
+        store: QueueStore,
+        skip_templates: SkipTemplateStore,
+    ):
         self._spotify = spotify
         self._store = store
+        self._skip_templates = skip_templates
         self._adem = AdemMode(store)
         self._version: int = 0
         self._events: list[PartyEvent] = []
@@ -329,7 +335,7 @@ class PartyService:
             return None
         if not self._skip_messages_enabled:
             return None
-        templates = self._store.get_skip_templates()
+        templates = self._skip_templates.get_all()
         if not templates:
             return None
         template = random.choice(templates)
@@ -369,13 +375,16 @@ class PartyService:
         return self._store.get_known_requesters()
 
     def get_skip_templates(self):
-        return self._store.get_skip_templates()
+        return self._skip_templates.get_all()
 
     def add_skip_template(self, text: str) -> None:
-        self._store.add_skip_template(text)
+        self._skip_templates.add(text)
 
     def remove_skip_template(self, uid: str) -> None:
-        self._store.remove_skip_template(uid)
+        self._skip_templates.remove(uid)
+
+    def reset_skip_templates(self) -> None:
+        self._skip_templates.reset_to_default()
 
     def get_devices(self) -> list[dict]:
         return self._spotify.get_devices()

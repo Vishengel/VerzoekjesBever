@@ -233,6 +233,11 @@ class DJPage:
                 skip_msg_toggle()
 
                 ui.button(
+                    icon="edit_note",
+                    on_click=self._open_skip_messages,
+                ).props("flat round dense color=grey").tooltip("Edit skip messages")
+
+                ui.button(
                     "Display",
                     on_click=lambda: ui.run_javascript(
                         "window.open('/display', '_blank')"
@@ -380,7 +385,6 @@ class DJPage:
 
             self._render_all()
             self._build_update_timer()
-            self._build_skip_messages_panel()
 
     def _render_all(self):
         self._render_now_playing()
@@ -632,17 +636,16 @@ class DJPage:
 
         ui.timer(1.0, check_updates)
 
-    def _build_skip_messages_panel(self):
-        with ui.expansion("💬 Skip messages", icon="chat").classes(
-            "w-full bg-gray-900 rounded"
-        ):
+    def _open_skip_messages(self):
+        with ui.dialog() as dialog, ui.card().classes("bg-gray-900 min-w-[360px]"):
+            ui.label("💬 Skip messages").classes("text-lg font-bold")
 
             @ui.refreshable
             def template_list():
                 templates = self.svc.get_skip_templates()
                 if not templates:
                     ui.label(
-                        "No skip messages — paid skips will skip silently."
+                        "No skip messages. Paid skips will skip silently."
                     ).classes("text-gray-500 italic text-sm")
                 for tpl in templates:
                     with ui.row().classes("w-full items-center gap-2"):
@@ -658,7 +661,7 @@ class DJPage:
             template_list()
 
             new_input = ui.input(
-                placeholder="New message — use {victim} {skipper} {artist}",
+                placeholder="New message: use {victim} {skipper} {artist}",
             ).classes("w-full")
 
             def add_template():
@@ -670,7 +673,22 @@ class DJPage:
                 template_list.refresh()
 
             new_input.on("keydown.enter", add_template)
-            ui.button("Add message", on_click=add_template).props("color=primary dense")
+
+            def reset_defaults():
+                self.svc.reset_skip_templates()
+                template_list.refresh()
+                ui.notify("Skip messages reset to default", type="info")
+
+            with ui.row().classes("w-full justify-between items-center gap-2 mt-2"):
+                ui.button("Reset to default", on_click=reset_defaults).props(
+                    "flat color=warning dense"
+                )
+                with ui.row().classes("gap-2"):
+                    ui.button("Add message", on_click=add_template).props(
+                        "color=primary dense"
+                    )
+                    ui.button("Close", on_click=dialog.close).props("flat color=grey")
+        dialog.open()
 
     def _open_edit_requester(self, uid: str):
         current_name = self.svc.get_requester(uid)
@@ -726,6 +744,9 @@ class DJPage:
                 ui.button("Cancel", on_click=dialog.close).props("flat color=grey")
                 ui.button("Skip it", on_click=confirm).props("color=primary")
         dialog.open()
+        # Dialog has an open transition (~300ms); the input isn't focusable
+        # until it's rendered and visible, so defer the focus past the animation.
+        ui.timer(0.3, lambda: name_input.run_method("focus"), once=True)
 
     def _confirm_clear_queue(self):
         count = len(self.svc.get_queue())

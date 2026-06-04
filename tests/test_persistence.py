@@ -390,35 +390,63 @@ def test_party_end_time_corrupt_value_falls_back_to_none(tmp_path: Path):
 
 
 def test_skip_templates_seeded_on_fresh_store(tmp_path):
-    from persistence import QueueStore
+    from persistence import SkipTemplateStore
     from models import DEFAULT_SKIP_TEMPLATES
 
-    store = QueueStore(tmp_path / "session.json")
-    texts = [t.text for t in store.get_skip_templates()]
+    store = SkipTemplateStore(tmp_path / "skip_templates.json")
+    texts = [t.text for t in store.get_all()]
     pytest.assume(texts == DEFAULT_SKIP_TEMPLATES)
 
 
 def test_skip_templates_add_and_remove(tmp_path):
-    from persistence import QueueStore
+    from persistence import SkipTemplateStore
 
-    store = QueueStore(tmp_path / "session.json")
-    store.add_skip_template("{skipper} loathes {artist}, sorry {victim}")
-    added = [t for t in store.get_skip_templates() if "loathes" in t.text]
+    store = SkipTemplateStore(tmp_path / "skip_templates.json")
+    store.add("{skipper} loathes {artist}, sorry {victim}")
+    added = [t for t in store.get_all() if "loathes" in t.text]
     pytest.assume(len(added) == 1)
 
     uid = added[0].uid
-    store.remove_skip_template(uid)
-    pytest.assume(all(t.uid != uid for t in store.get_skip_templates()))
+    store.remove(uid)
+    pytest.assume(all(t.uid != uid for t in store.get_all()))
 
 
 def test_skip_templates_persist_and_deletion_not_resurrected(tmp_path):
-    from persistence import QueueStore
+    from persistence import SkipTemplateStore
 
-    path = tmp_path / "session.json"
-    store = QueueStore(path)
-    for t in list(store.get_skip_templates()):
-        store.remove_skip_template(t.uid)
-    pytest.assume(store.get_skip_templates() == [])
+    path = tmp_path / "skip_templates.json"
+    store = SkipTemplateStore(path)
+    for t in list(store.get_all()):
+        store.remove(t.uid)
+    pytest.assume(store.get_all() == [])
 
-    reloaded = QueueStore(path)
-    pytest.assume(reloaded.get_skip_templates() == [])
+    reloaded = SkipTemplateStore(path)
+    pytest.assume(reloaded.get_all() == [])
+
+
+def test_skip_templates_survive_session_reset(tmp_path):
+    """Templates live in their own file, so starting a fresh session (a
+    separate QueueStore) must not wipe them."""
+    from persistence import QueueStore, SkipTemplateStore
+
+    skip_path = tmp_path / "skip_templates.json"
+    skip = SkipTemplateStore(skip_path)
+    skip.add("{skipper} can't stand {artist}, sorry {victim}")
+    custom_count = len(skip.get_all())
+
+    session = QueueStore(tmp_path / "session.json")
+    session.start_session("Party", "dev1")
+
+    reloaded = SkipTemplateStore(skip_path)
+    pytest.assume(len(reloaded.get_all()) == custom_count)
+
+
+def test_skip_templates_reset_to_default(tmp_path):
+    from persistence import SkipTemplateStore
+    from models import DEFAULT_SKIP_TEMPLATES
+
+    store = SkipTemplateStore(tmp_path / "skip_templates.json")
+    store.add("a throwaway one")
+    store.reset_to_default()
+    texts = [t.text for t in store.get_all()]
+    pytest.assume(texts == DEFAULT_SKIP_TEMPLATES)
