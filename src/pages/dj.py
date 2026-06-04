@@ -425,6 +425,13 @@ class DJPage:
             ui.button(
                 "⏭ Next", on_click=lambda: (self.svc.play_next(), self._refresh_all())
             ).props("color=primary")
+            next_disabled = not self.svc.get_queue()
+            paid_btn = ui.button(
+                "💰 Paid skip",
+                on_click=self._open_paid_skip,
+            ).props("color=secondary")
+            if next_disabled:
+                paid_btn.props(add="disable")
 
     def _render_now_playing(self):
         current = self.svc.get_currently_playing()
@@ -644,6 +651,39 @@ class DJPage:
             with ui.row().classes("w-full justify-end gap-2 mt-2"):
                 ui.button("Cancel", on_click=dialog.close).props("flat color=grey")
                 ui.button("Save", on_click=save).props("color=primary")
+        dialog.open()
+
+    def _open_paid_skip(self):
+        current = self.svc.get_currently_playing()
+        with ui.dialog() as dialog, ui.card().classes("bg-gray-900 min-w-[320px]"):
+            ui.label("Paid skip").classes("text-lg font-bold")
+            if current:
+                victim = current.requester or "no requester"
+                ui.label(
+                    f"Skipping: {current.track_name} – {current.artist} "
+                    f"(requested by {victim})"
+                ).classes("text-sm text-gray-400")
+            else:
+                ui.label("Nothing is playing right now.").classes(
+                    "text-sm text-gray-400"
+                )
+            name_input = ui.input(
+                placeholder="Who paid?",
+                autocomplete=self.svc.get_known_requesters(),
+            ).classes("w-full")
+
+            def confirm():
+                name = name_input.value.strip() if name_input.value else ""
+                if not name:
+                    return
+                self.svc.paid_skip(name)
+                self._refresh_all()
+                dialog.close()
+
+            name_input.on("keydown.enter", confirm)
+            with ui.row().classes("w-full justify-end gap-2 mt-2"):
+                ui.button("Cancel", on_click=dialog.close).props("flat color=grey")
+                ui.button("Skip it", on_click=confirm).props("color=primary")
         dialog.open()
 
     def _confirm_clear_queue(self):
