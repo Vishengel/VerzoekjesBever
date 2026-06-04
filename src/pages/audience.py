@@ -1,5 +1,6 @@
 import asyncio
 import io
+import json
 import socket
 from dataclasses import dataclass
 from datetime import datetime
@@ -419,6 +420,17 @@ def audience_page():
                 if event.kind == PartyEventType.SKIPPED and svc.beaver_enabled:
                     await ui.run_javascript("triggerBeaverAnimation()")
                     await asyncio.sleep(2.2)
+
+                if event.kind == PartyEventType.PAID_SKIP:
+                    if svc.beaver_enabled:
+                        await ui.run_javascript("triggerBeaverAnimation()")
+                        await asyncio.sleep(2.2)
+                    if event.message:
+                        await ui.run_javascript(
+                            f"triggerPaidSkipOverlay({json.dumps(event.message)})"
+                        )
+                        await asyncio.sleep(6)
+
                 if event.kind == PartyEventType.ADDED and svc.beaver_enabled:
                     pending_add["uri"] = event.track_uri
                 if event.kind == PartyEventType.MOVED_TO_TOP:
