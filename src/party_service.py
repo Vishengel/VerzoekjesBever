@@ -308,8 +308,13 @@ class PartyService:
 
     def paid_skip(self, skipper: str) -> None:
         victim_item = self._store.currently_playing
-        item = self._skip_to_next()
+        self._refill_adem_if_needed()
+        item = self._store.pop_next()
         if item is None:
+            return
+        started = self._start_track(item)
+        self._bump_version()
+        if not started:
             return
         message = self._build_paid_skip_message(skipper, victim_item)
         if message is None:
