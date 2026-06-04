@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import io
 import socket
+from dataclasses import dataclass
 
 import segno
 from nicegui import ui
@@ -17,6 +18,55 @@ from models import (
 )
 
 QUEUE_WINDOW = 30
+
+
+@dataclass(frozen=True)
+class AudienceRowVM:
+    uid: str
+    track_name: str
+    artist: str
+    thumb_url: str
+    requester: str
+    position: int
+    eta_ms: int
+    is_last: bool
+    is_target: bool  # incoming-add animation target (pending_add)
+    is_glow: bool  # priority-glow animation target (pending_glow)
+
+
+def audience_row_vms(
+    queue: list,
+    *,
+    window: int,
+    pending_add_uri: str | None,
+    pending_glow_uri: str | None,
+) -> list[AudienceRowVM]:
+    """Pure view-models for the audience queue rows (windowed, with ETA)."""
+    positioned = filter_queue_with_positions(queue, "")[:window]
+    vms: list[AudienceRowVM] = []
+    for i, p in enumerate(positioned):
+        item = p.item
+        is_target = bool(pending_add_uri) and item.track_uri == pending_add_uri
+        is_glow = (
+            not is_target
+            and bool(pending_glow_uri)
+            and item.track_uri == pending_glow_uri
+        )
+        vms.append(
+            AudienceRowVM(
+                uid=item.uid,
+                track_name=item.track_name,
+                artist=item.artist,
+                thumb_url=item.thumb_url,
+                requester=item.requester or "",
+                position=p.position,
+                eta_ms=p.eta_ms,
+                is_last=i == len(positioned) - 1,
+                is_target=is_target,
+                is_glow=is_glow,
+            )
+        )
+    return vms
 
 
 def _get_local_ip() -> str:
