@@ -1073,3 +1073,73 @@ def test_skip_template_crud_passthrough(service):
     target = next(t for t in after if "can't stand" in t.text)
     service.remove_skip_template(target.uid)
     pytest.assume(all(t.uid != target.uid for t in service.get_skip_templates()))
+
+
+def _seed_now_playing(service, victim):
+    # queue two songs, advance so the first becomes "currently playing"
+    service.start_session("Party", "dev1")
+    service.add_to_queue(
+        _make_item("Africa", artist="Toto", uri="spotify:track:af", requester=victim)
+    )
+    service.add_to_queue(
+        _make_item("Next", artist="NextArtist", uri="spotify:track:nx", requester="Bob")
+    )
+    service.play_next()  # Africa is now currently_playing, "Next" still queued
+
+
+def test_paid_skip_emits_paid_skip_with_rendered_message(service):
+    _seed_now_playing(service, victim="Dorieke")
+    v = service.version
+    service.paid_skip("Jelle")
+    events = [
+        e for e in service.get_events_since(v) if e.kind == PartyEventType.PAID_SKIP
+    ]
+    pytest.assume(len(events) == 1)
+    msg = events[0].message
+    pytest.assume(msg is not None)
+    pytest.assume("Jelle" in msg)
+    pytest.assume("Dorieke" in msg)
+    pytest.assume("Toto" in msg)
+
+
+def test_paid_skip_toggle_off_emits_plain_skipped(service):
+    _seed_now_playing(service, victim="Dorieke")
+    service.set_skip_messages_enabled(False)
+    v = service.version
+    service.paid_skip("Jelle")
+    kinds = [e.kind for e in service.get_events_since(v)]
+    pytest.assume(PartyEventType.SKIPPED in kinds)
+    pytest.assume(PartyEventType.PAID_SKIP not in kinds)
+
+
+def test_paid_skip_empty_pool_emits_plain_skipped(service):
+    _seed_now_playing(service, victim="Dorieke")
+    for t in list(service.get_skip_templates()):
+        service.remove_skip_template(t.uid)
+    v = service.version
+    service.paid_skip("Jelle")
+    kinds = [e.kind for e in service.get_events_since(v)]
+    pytest.assume(PartyEventType.SKIPPED in kinds)
+    pytest.assume(PartyEventType.PAID_SKIP not in kinds)
+
+
+def test_paid_skip_no_current_song_emits_plain_skipped(service):
+    # session started, nothing playing yet, one song queued
+    service.start_session("Party", "dev1")
+    service.add_to_queue(
+        _make_item("Africa", artist="Toto", uri="spotify:track:af", requester="X")
+    )
+    v = service.version
+    service.paid_skip("Jelle")
+    kinds = [e.kind for e in service.get_events_since(v)]
+    pytest.assume(PartyEventType.SKIPPED in kinds)
+    pytest.assume(PartyEventType.PAID_SKIP not in kinds)
+
+
+def test_paid_skip_advances_queue_like_play_next(service):
+    _seed_now_playing(service, victim="Dorieke")
+    service.paid_skip("Jelle")
+    current = service.get_currently_playing()
+    pytest.assume(current is not None)
+    pytest.assume(current.track_name == "Next")
+    pytest.assume(service.get_queue() == [])

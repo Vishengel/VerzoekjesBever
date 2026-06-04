@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import random
 import time
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -16,6 +17,7 @@ from models import (
     PlaybackState,
     QueueItem,
     queue_fits,
+    render_skip_message,
     resolve_party_end,
 )
 from persistence import QueueStore
@@ -133,7 +135,12 @@ class PartyService:
         return [e for e in self._events if e.version > since_version]
 
     def _emit(
-        self, kind: PartyEventType, track_uri: str, *, is_priority: bool = False
+        self,
+        kind: PartyEventType,
+        track_uri: str,
+        *,
+        is_priority: bool = False,
+        message: str | None = None,
     ) -> None:
         self._events.append(
             PartyEvent(
@@ -141,6 +148,7 @@ class PartyService:
                 track_uri=track_uri,
                 version=self._version,
                 is_priority=is_priority,
+                message=message,
             )
         )
         if len(self._events) > self.MAX_EVENTS:
@@ -297,6 +305,35 @@ class PartyService:
         self._bump_version()
         if started:
             self._emit(PartyEventType.SKIPPED, item.track_uri)
+
+    def paid_skip(self, skipper: str) -> None:
+        victim_item = self._store.currently_playing
+        item = self._skip_to_next()
+        if item is None:
+            return
+        message = self._build_paid_skip_message(skipper, victim_item)
+        if message is None:
+            self._emit(PartyEventType.SKIPPED, item.track_uri)
+        else:
+            self._emit(PartyEventType.PAID_SKIP, item.track_uri, message=message)
+
+    def _build_paid_skip_message(
+        self, skipper: str, victim_item: QueueItem | None
+    ) -> str | None:
+        if victim_item is None:
+            return None
+        if not self._skip_messages_enabled:
+            return None
+        templates = self._store.get_skip_templates()
+        if not templates:
+            return None
+        template = random.choice(templates)
+        return render_skip_message(
+            template.text,
+            skipper=skipper,
+            victim=victim_item.requester,
+            artist=victim_item.artist,
+        )
 
     def pause(self) -> None:
         self._spotify.pause(device_id=self._store.device_id)
