@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Generic, Protocol, TypeVar, runtime_checkable
 
 
 class DuplicateKeyError(ValueError):
@@ -66,3 +68,63 @@ def diff_keyed(old_keys: list[str], new_keys: list[str]) -> list[Op]:
             current.pop(cur_index)
             current.insert(target_index, key)
     return ops
+
+
+@runtime_checkable
+class RowHandle(Protocol):
+    root: object  # the row's outermost element; needs .move() and .delete()
+
+
+T = TypeVar("T")
+H = TypeVar("H", bound=RowHandle)
+
+
+class KeyedList(Generic[T, H]):
+    """Reconcile a container's child rows against an ordered list of view-models.
+
+    ``key`` extracts a stable unique key per view-model. ``build`` creates a row
+    once (parented into ``container``) and returns a handle exposing ``.root``;
+    ``patch`` updates the mutable fields of an existing row in place. On each
+    ``reconcile`` only the diff is applied — new rows built, gone rows deleted,
+    reordered rows moved — and every surviving/new row is patched.
+    """
+
+    def __init__(
+        self,
+        container,
+        *,
+        key: Callable[[T], str],
+        build: Callable[[T], H],
+        patch: Callable[[H, T], None],
+    ) -> None:
+        self._container = container
+        self._key = key
+        self._build = build
+        self._patch = patch
+        self._handles: dict[str, H] = {}
+        self._order: list[str] = []
+
+    @property
+    def order(self) -> list[str]:
+        return list(self._order)
+
+    def handle(self, key: str) -> H:
+        return self._handles[key]
+
+    def reconcile(self, items: list[T]) -> None:
+        new_keys = [self._key(item) for item in items]
+        ops = diff_keyed(self._order, new_keys)
+        item_by_key = dict(zip(new_keys, items, strict=True))
+        for op in ops:
+            if isinstance(op, Delete):
+                self._handles.pop(op.key).root.delete()
+            elif isinstance(op, Insert):
+                with self._container:
+                    handle = self._build(item_by_key[op.key])
+                self._handles[op.key] = handle
+                handle.root.move(target_index=op.index)
+            elif isinstance(op, Move):
+                self._handles[op.key].root.move(target_index=op.index)
+        self._order = new_keys
+        for key, item in item_by_key.items():
+            self._patch(self._handles[key], item)
