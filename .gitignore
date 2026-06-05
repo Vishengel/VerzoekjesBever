@@ -5,3 +5,5 @@
 data/
 **/session.json
 **/.nicegui
+# git worktrees
+.worktrees/
