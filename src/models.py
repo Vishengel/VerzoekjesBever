@@ -1,4 +1,5 @@
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
 from enum import StrEnum
 from uuid import uuid4
 
@@ -192,6 +193,16 @@ def format_queue_duration(total_ms: int) -> str:
     if hours:
         return f"{hours}h {minutes}m"
     return f"{minutes}m {seconds}s"
+
+
+def format_clock_eta(eta_ms: int, now: datetime) -> str:
+    """Wall-clock time (24h ``HH:MM``) when a song ``eta_ms`` from now will play.
+
+    ``eta_ms`` is the estimated milliseconds until the song starts; the result is
+    the absolute time, so it stays correct between renders (as wall-clock time
+    advances the remaining wait shrinks by the same amount). Wraps past midnight.
+    """
+    return (now + timedelta(milliseconds=eta_ms)).strftime("%H:%M")
 
 
 def format_queue_stats(queue: list[QueueItem]) -> str:

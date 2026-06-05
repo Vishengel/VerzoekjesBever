@@ -220,6 +220,17 @@ class PartyService:
     def get_currently_playing(self) -> QueueItem | None:
         return self._store.currently_playing
 
+    def get_current_remaining_ms(self) -> int:
+        """Estimated ms left in the current track, 0 when nothing is playing.
+
+        Uses the high-water progress mark observed while playing, so a queued
+        song's clock ETA can offset by the current track's remaining time.
+        """
+        current = self._store.currently_playing
+        if current is None:
+            return 0
+        return max(0, current.duration_ms - self._last_progress_ms)
+
     def _start_track(self, item: QueueItem) -> bool:
         """Play item, timestamp the command, mark it playing.
 

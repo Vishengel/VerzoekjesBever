@@ -1,12 +1,26 @@
+from datetime import datetime
+
 from models import (
     QueueItem,
     PlaybackState,
     search_queue,
     filter_queue_with_positions,
     format_queue_stats,
+    format_clock_eta,
     select_album_art,
 )
 import pytest
+
+
+def test_format_clock_eta_adds_eta_and_formats_24h():
+    now = datetime(2026, 6, 5, 21, 40)
+    pytest.assume(format_clock_eta(0, now) == "21:40")
+    pytest.assume(format_clock_eta(5 * 60_000, now) == "21:45")
+
+
+def test_format_clock_eta_rolls_past_midnight():
+    near_midnight = datetime(2026, 6, 5, 23, 50)
+    pytest.assume(format_clock_eta(40 * 60_000, near_midnight) == "00:30")
 
 
 def test_format_queue_stats_with_durations():

@@ -2,6 +2,7 @@ import asyncio
 import io
 import socket
 from dataclasses import dataclass
+from datetime import datetime
 
 import segno
 from nicegui import ui
@@ -11,7 +12,7 @@ from keyed_list import KeyedList
 from models import (
     PartyEventType,
     filter_queue_with_positions,
-    format_queue_duration,
+    format_clock_eta,
     format_queue_stats,
     search_queue,
 )
@@ -213,7 +214,10 @@ def audience_page():
             if vm.eta_ms == 0:
                 eta_text, eta_cls = "Up next", ETA_NEXT
             else:
-                eta_text, eta_cls = f"ETA {format_queue_duration(vm.eta_ms)}", ETA_WAIT
+                clock = format_clock_eta(
+                    svc.get_current_remaining_ms() + vm.eta_ms, datetime.now()
+                )
+                eta_text, eta_cls = f"ETA {clock}", ETA_WAIT
             if h.eta.text != eta_text:
                 h.eta.set_text(eta_text)
             if h.eta_cls != eta_cls:
@@ -354,7 +358,10 @@ def audience_page():
                                 "text-green-300 font-semibold whitespace-nowrap"
                             )
                         else:
-                            eta = format_queue_duration(match.eta_ms)
+                            eta = format_clock_eta(
+                                svc.get_current_remaining_ms() + match.eta_ms,
+                                datetime.now(),
+                            )
                             ui.label(f"#{match.position} · ETA {eta}").classes(
                                 "text-green-300 font-semibold whitespace-nowrap"
                             )

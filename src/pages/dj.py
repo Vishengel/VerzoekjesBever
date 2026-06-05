@@ -1,4 +1,5 @@
 from dataclasses import dataclass, replace
+from datetime import datetime
 
 from nicegui import app, ui
 
@@ -9,7 +10,7 @@ from models import (
     PlaybackState,
     QueueItem,
     filter_queue_with_positions,
-    format_queue_duration,
+    format_clock_eta,
     format_queue_stats,
 )
 from party_service import PartyService
@@ -498,9 +499,13 @@ class DJPage:
     def _patch_dj_row(self, h: _DJRow, vm: DJRowVM):
         if h.pos.text != str(vm.position):
             h.pos.set_text(str(vm.position))
-        eta_text = (
-            "Up next!" if vm.eta_ms == 0 else f"ETA {format_queue_duration(vm.eta_ms)}"
-        )
+        if vm.eta_ms == 0:
+            eta_text = "Up next!"
+        else:
+            clock = format_clock_eta(
+                self.svc.get_current_remaining_ms() + vm.eta_ms, datetime.now()
+            )
+            eta_text = f"ETA {clock}"
         if h.eta.text != eta_text:
             h.eta.set_text(eta_text)
         req_text = f"🎤 {vm.requester}" if vm.requester else ""
