@@ -182,7 +182,13 @@ def audience_page():
             list_container = ui.column().classes("w-full gap-0")
             more_label = ui.label("").classes("text-center text-gray-500 text-sm py-2")
 
-        BASE_ROW = "items-center gap-3 px-4 py-3 w-full"
+        # NOTE: leading "nicegui-row" is the framework's default flex class
+        # (display:flex; flex-direction:row). _patch_row reapplies BASE_ROW via
+        # .classes(replace=...), which wipes ALL classes including the defaults
+        # added by ui.row()'s constructor. Without "nicegui-row" here the row
+        # collapses to a block and children stack vertically. Any new structural
+        # default class must be added to BASE_ROW too, or replace= will nuke it.
+        BASE_ROW = "nicegui-row items-center gap-3 px-4 py-3 w-full"
         ETA_NEXT = (
             "text-green-400 font-bold text-sm whitespace-nowrap ml-auto "
             "bg-white/5 rounded-full px-3 py-1 w-28 text-center"
