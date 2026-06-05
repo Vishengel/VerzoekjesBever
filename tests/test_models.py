@@ -9,6 +9,7 @@ from models import (
     format_clock_eta,
     select_album_art,
     queue_fits,
+    resolve_party_end,
 )
 import pytest
 
@@ -366,3 +367,28 @@ def test_queue_fits_counts_current_remaining_and_queue():
     q = [_item(track_name="A", duration_ms=10 * 60_000)]
     pytest.assume(queue_fits(end, now, 10 * 60_000, q, 11 * 60_000) is False)
     pytest.assume(queue_fits(end, now, 10 * 60_000, q, 9 * 60_000) is True)
+
+
+def test_resolve_party_end_later_today():
+    now = datetime(2026, 6, 5, 20, 0)
+    pytest.assume(resolve_party_end("23:30", now) == datetime(2026, 6, 5, 23, 30))
+
+
+def test_resolve_party_end_rolls_to_tomorrow():
+    now = datetime(2026, 6, 5, 23, 0)
+    pytest.assume(resolve_party_end("02:00", now) == datetime(2026, 6, 6, 2, 0))
+
+
+def test_resolve_party_end_zeroes_seconds():
+    now = datetime(2026, 6, 5, 23, 30, 45)
+    pytest.assume(resolve_party_end("23:30", now) == datetime(2026, 6, 6, 23, 30, 0, 0))
+
+
+def test_resolve_party_end_exact_now_returns_today():
+    now = datetime(2026, 6, 5, 23, 0, 0)
+    pytest.assume(resolve_party_end("23:00", now) == datetime(2026, 6, 5, 23, 0))
+
+
+def test_resolve_party_end_rejects_malformed():
+    with pytest.raises(ValueError):
+        resolve_party_end("not-a-time", datetime(2026, 6, 5, 20, 0))

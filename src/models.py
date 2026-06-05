@@ -230,6 +230,20 @@ def queue_fits(
     return now + timedelta(milliseconds=total_ms) <= end_time
 
 
+def resolve_party_end(hhmm: str, now: datetime) -> datetime:
+    """Resolve an ``'HH:MM'`` time-of-day to its next occurrence at/after ``now``.
+
+    Returns today's date at ``HH:MM`` when that moment is still ahead; otherwise
+    tomorrow's. Seconds and microseconds are zeroed. Raises ``ValueError`` for
+    malformed input.
+    """
+    hours, minutes = (int(part) for part in hhmm.split(":"))
+    candidate = now.replace(hour=hours, minute=minutes, second=0, microsecond=0)
+    if candidate < now:
+        candidate += timedelta(days=1)
+    return candidate
+
+
 def format_queue_stats(queue: list[QueueItem]) -> str:
     """One-line queue summary: song count plus total remaining time when known."""
     total_ms = sum(item.duration_ms for item in queue)
