@@ -105,12 +105,18 @@ def audience_page():
     """)
 
     with ui.column().classes("w-full max-w-3xl mx-auto p-8 gap-6"):
-        with ui.column().classes("items-center gap-1"):
-            ui.image("/static/beaver.svg").classes("w-12 h-12")
-            ui.label("VERZOEKJESBEVER").classes(
-                "text-2xl font-extrabold tracking-wide text-white"
-            )
-            ui.label("REQUEST PARTY").classes("text-xs tracking-[0.3em] text-green-400")
+        # Compact horizontal brand bar (logo + title inline) frees vertical room
+        # for the queue. Stays a slim strip on mobile — a true sidebar would be
+        # too cramped on narrow phones.
+        with ui.row().classes("items-center gap-3 w-full"):
+            ui.image("/static/beaver.svg").classes("w-10 h-10")
+            with ui.column().classes("gap-0"):
+                ui.label("VERZOEKJESBEVER").classes(
+                    "text-xl font-extrabold tracking-wide text-white leading-tight"
+                )
+                ui.label("REQUEST PARTY").classes(
+                    "text-[0.6rem] tracking-[0.3em] text-green-400"
+                )
 
         if not svc.has_session:
             with ui.card().classes("w-full bg-gray-800 rounded-xl p-8 text-center"):
@@ -578,7 +584,11 @@ def audience_page():
             for event in events:
                 if event.kind == PartyEventType.SKIPPED and svc.beaver_enabled:
                     await ui.run_javascript("triggerBeaverAnimation()")
-                    await asyncio.sleep(2.2)
+                    # Chomp keyframes run 2.0s; runBeaverDestroy clears its class
+                    # at 2.2s. Rebuild the now-playing card at 2.0s — right as the
+                    # chomp finishes — so the new song swaps in before the card
+                    # snaps back, instead of racing the cleanup (caused a flicker).
+                    await asyncio.sleep(2.0)
 
                 if event.kind == PartyEventType.SHAME_DELETE:
                     if svc.beaver_enabled and event.uid:
