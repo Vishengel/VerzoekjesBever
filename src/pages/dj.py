@@ -740,6 +740,8 @@ class DJPage:
                 ui.button("Cancel", on_click=dialog.close).props("flat color=grey")
                 ui.button("Shame & delete", on_click=confirm).props("color=negative")
         dialog.open()
+        # The dialog needs ~300ms to mount before the input is focusable.
+        ui.timer(0.3, lambda: name_input.run_method("focus"), once=True)
 
     def _confirm_clear_queue(self):
         count = len(self.svc.get_queue())
