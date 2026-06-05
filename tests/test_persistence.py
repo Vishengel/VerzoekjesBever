@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 
 from models import QueueItem, PlaybackState
@@ -345,3 +346,44 @@ def test_remove_by_uid_only_removes_one_duplicate(tmp_path: Path):
     uid_to_remove = store.queue[0].uid
     store.remove_from_queue(uid_to_remove)
     pytest.assume(len(store.queue) == 1)
+
+
+def test_party_end_time_defaults_none(tmp_path: Path):
+    store = QueueStore(tmp_path / "session.json")
+    pytest.assume(store.party_end_time is None)
+
+
+def test_party_end_time_roundtrips(tmp_path: Path):
+    path = tmp_path / "session.json"
+    store = QueueStore(path)
+    end = datetime(2026, 6, 6, 2, 0)
+    store.set_party_end_time(end)
+    reloaded = QueueStore(path)
+    pytest.assume(reloaded.party_end_time == end)
+
+
+def test_party_end_time_legacy_file_without_key(tmp_path: Path):
+    import json
+
+    path = tmp_path / "session.json"
+    path.write_text(json.dumps({"session_name": "Old", "queue": []}))
+    store = QueueStore(path)
+    pytest.assume(store.party_end_time is None)
+
+
+def test_clear_party_end_time(tmp_path: Path):
+    path = tmp_path / "session.json"
+    store = QueueStore(path)
+    store.set_party_end_time(datetime(2026, 6, 6, 2, 0))
+    store.set_party_end_time(None)
+    reloaded = QueueStore(path)
+    pytest.assume(reloaded.party_end_time is None)
+
+
+def test_party_end_time_corrupt_value_falls_back_to_none(tmp_path: Path):
+    import json
+
+    path = tmp_path / "session.json"
+    path.write_text(json.dumps({"party_end_time": "not-a-date", "queue": []}))
+    store = QueueStore(path)
+    pytest.assume(store.party_end_time is None)

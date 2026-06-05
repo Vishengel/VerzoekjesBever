@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime
 from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
@@ -18,6 +19,7 @@ class QueueStore:
         self._currently_playing: QueueItem | None = None
         self._queue: list[QueueItem] = []
         self._adem_mode_active: bool = False
+        self._party_end_time: datetime | None = None
         self._load()
 
     @property
@@ -47,6 +49,14 @@ class QueueStore:
     @property
     def adem_mode_active(self) -> bool:
         return self._adem_mode_active
+
+    @property
+    def party_end_time(self) -> datetime | None:
+        return self._party_end_time
+
+    def set_party_end_time(self, end_time: datetime | None) -> None:
+        self._party_end_time = end_time
+        self._save()
 
     def start_session(self, name: str, device_id: str) -> None:
         self._session_name = name
@@ -162,6 +172,12 @@ class QueueStore:
         self._adem_mode_active = data.get(
             "adem_mode_active", data.get("demo_queue_active", False)
         )
+        pet = data.get("party_end_time")
+        try:
+            self._party_end_time = datetime.fromisoformat(pet) if pet else None
+        except ValueError:
+            logger.warning("Invalid party_end_time in %s, ignoring", self._path)
+            self._party_end_time = None
 
     def _save(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -174,6 +190,9 @@ class QueueStore:
             else None,
             "queue": [q.to_dict() for q in self._queue],
             "adem_mode_active": self._adem_mode_active,
+            "party_end_time": self._party_end_time.isoformat()
+            if self._party_end_time
+            else None,
         }
         tmp = self._path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, indent=2))
