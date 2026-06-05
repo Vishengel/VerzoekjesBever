@@ -16,6 +16,7 @@ from models import (
 from party_service import PartyService
 
 DJ_QUEUE_WINDOW = 50
+_END_TIME_FMT = "%a %b %d, %H:%M"
 
 
 @dataclass(frozen=True)
@@ -166,6 +167,55 @@ class DJPage:
 
                 qr_toggle()
 
+                @ui.refreshable
+                def end_time_control():
+                    end = self.svc.get_party_end()
+
+                    def _apply(value: str):
+                        val = (value or "").strip()
+                        if not val:
+                            return
+                        try:
+                            resolved = self.svc.set_party_end(val)
+                        except (ValueError, TypeError):
+                            ui.notify("Use HH:MM (e.g. 02:00)", type="negative")
+                            return
+                        ui.notify(
+                            f"Party ends {resolved.strftime(_END_TIME_FMT)}",
+                            type="positive",
+                        )
+                        end_time_control.refresh()
+                        self._render_queue()
+
+                    with ui.row().classes("items-center gap-1"):
+                        time_in = (
+                            ui.input(placeholder="HH:MM").props("dense").classes("w-24")
+                        )
+                        if end:
+                            time_in.value = end.strftime("%H:%M")
+                        time_in.on("keydown.enter", lambda: _apply(time_in.value))
+                        ui.button(
+                            icon="schedule", on_click=lambda: _apply(time_in.value)
+                        ).props("flat round dense color=grey").tooltip(
+                            "Set party end time"
+                        )
+                        if end:
+                            ui.label(f"Ends {end.strftime(_END_TIME_FMT)}").classes(
+                                "text-xs text-green-400"
+                            )
+                            ui.button(
+                                icon="close",
+                                on_click=lambda: (
+                                    self.svc.clear_party_end(),
+                                    end_time_control.refresh(),
+                                    self._render_queue(),
+                                ),
+                            ).props("flat round dense color=grey").tooltip(
+                                "Clear end time"
+                            )
+
+                end_time_control()
+
                 ui.button(
                     "Display",
                     on_click=lambda: ui.run_javascript(
@@ -222,6 +272,7 @@ class DJPage:
                 self._render_search_result(item)
 
     def _render_search_result(self, item: QueueItem):
+        fits = self.svc.can_fit(item.duration_ms)
         with ui.card().classes("w-full bg-gray-800"):
             with ui.row().classes("items-center gap-3 w-full"):
                 if item.thumb_url:
@@ -229,14 +280,19 @@ class DJPage:
                 with ui.column().classes("flex-grow gap-0"):
                     ui.label(item.track_name).classes("font-semibold")
                     ui.label(item.artist).classes("text-sm text-gray-400")
-                ui.button(
+                if not fits:
+                    ui.label("⛔ after end time").classes("text-xs text-red-400")
+                add_btn = ui.button(
                     "+ Add",
                     on_click=lambda i=item: self._add_song(i, top=False),
                 ).props("color=primary dense")
-                ui.button(
+                top_btn = ui.button(
                     "⬆ Top",
                     on_click=lambda i=item: self._add_song(i, top=True),
                 ).props("color=warning dense")
+                if not fits:
+                    add_btn.props(add="disable")
+                    top_btn.props(add="disable")
 
     def _add_song(self, item: QueueItem, top: bool):
         requester = (
@@ -244,7 +300,13 @@ class DJPage:
         )
         if not requester:
             requester = "🦫 (anonymous)"
-        self.svc.add_to_queue(replace(item, requester=requester), top=top)
+        added = self.svc.add_to_queue(replace(item, requester=requester), top=top)
+        if not added:
+            ui.notify(
+                "Party ends before this song would finish — not added",
+                type="negative",
+            )
+            return
         position = "top" if top else "queue"
         ui.notify(
             f"Added '{item.track_name}' to {position} for {requester}", type="positive"
