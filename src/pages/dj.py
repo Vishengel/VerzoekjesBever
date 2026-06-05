@@ -218,24 +218,24 @@ class DJPage:
                 end_time_control()
 
                 @ui.refreshable
-                def skip_msg_toggle():
-                    enabled = self.svc.skip_messages_enabled
+                def shame_msg_toggle():
+                    enabled = self.svc.shame_messages_enabled
                     ui.button(
                         "💬 Shame ON" if enabled else "🤐 Shame OFF",
                         on_click=lambda: (
-                            self.svc.set_skip_messages_enabled(not enabled),
-                            skip_msg_toggle.refresh(),
+                            self.svc.set_shame_messages_enabled(not enabled),
+                            shame_msg_toggle.refresh(),
                         ),
                     ).props(
                         f"{'color=positive' if enabled else 'color=negative'} dense"
                     )
 
-                skip_msg_toggle()
+                shame_msg_toggle()
 
                 ui.button(
                     icon="edit_note",
-                    on_click=self._open_skip_messages,
-                ).props("flat round dense color=grey").tooltip("Edit skip messages")
+                    on_click=self._open_shame_messages,
+                ).props("flat round dense color=grey").tooltip("Edit shame messages")
 
                 ui.button(
                     "Display",
@@ -430,13 +430,6 @@ class DJPage:
             ui.button(
                 "⏭ Next", on_click=lambda: (self.svc.play_next(), self._refresh_all())
             ).props("color=primary")
-            next_disabled = not self.svc.get_queue()
-            paid_btn = ui.button(
-                "💰 Paid skip",
-                on_click=self._open_paid_skip,
-            ).props("color=secondary")
-            if next_disabled:
-                paid_btn.props(add="disable")
 
     def _render_now_playing(self):
         current = self.svc.get_currently_playing()
@@ -566,13 +559,22 @@ class DJPage:
                         self._render_queue(),
                     ),
                 ).props("flat round dense color=orange size=sm")
-                ui.button(
-                    icon="delete",
-                    on_click=lambda uid=vm.uid: (
-                        self.svc.remove_from_queue(uid),
-                        self._render_queue(),
-                    ),
-                ).props("flat round dense color=negative")
+                with ui.column().classes("gap-0"):
+                    ui.button(
+                        icon="delete",
+                        on_click=lambda uid=vm.uid: (
+                            self.svc.remove_from_queue(uid),
+                            self._render_queue(),
+                        ),
+                    ).props("flat round dense color=grey size=sm").tooltip(
+                        "Delete (quiet)"
+                    )
+                    ui.button(
+                        icon="paid",
+                        on_click=lambda uid=vm.uid: self._open_shame_delete(uid),
+                    ).props("flat round dense color=negative size=sm").tooltip(
+                        "Shame delete (paid)"
+                    )
         handle = _DJRow(
             root=card,
             pos=pos,
@@ -636,16 +638,16 @@ class DJPage:
 
         ui.timer(1.0, check_updates)
 
-    def _open_skip_messages(self):
+    def _open_shame_messages(self):
         with ui.dialog() as dialog, ui.card().classes("bg-gray-900 min-w-[360px]"):
-            ui.label("💬 Skip messages").classes("text-lg font-bold")
+            ui.label("💬 Shame messages").classes("text-lg font-bold")
 
             @ui.refreshable
             def template_list():
-                templates = self.svc.get_skip_templates()
+                templates = self.svc.get_shame_templates()
                 if not templates:
                     ui.label(
-                        "No skip messages. Paid skips will skip silently."
+                        "No shame messages. Shame deletes happen silently."
                     ).classes("text-gray-500 italic text-sm")
                 for tpl in templates:
                     with ui.row().classes("w-full items-center gap-2"):
@@ -653,7 +655,7 @@ class DJPage:
                         ui.button(
                             icon="delete",
                             on_click=lambda uid=tpl.uid: (
-                                self.svc.remove_skip_template(uid),
+                                self.svc.remove_shame_template(uid),
                                 template_list.refresh(),
                             ),
                         ).props("flat round dense color=negative size=sm")
@@ -661,23 +663,23 @@ class DJPage:
             template_list()
 
             new_input = ui.input(
-                placeholder="New message: use {victim} {skipper} {artist}",
+                placeholder="New message: use {victim} {skipper} {artist} {song}",
             ).classes("w-full")
 
             def add_template():
                 text = new_input.value.strip() if new_input.value else ""
                 if not text:
                     return
-                self.svc.add_skip_template(text)
+                self.svc.add_shame_template(text)
                 new_input.set_value("")
                 template_list.refresh()
 
             new_input.on("keydown.enter", add_template)
 
             def reset_defaults():
-                self.svc.reset_skip_templates()
+                self.svc.reset_shame_templates()
                 template_list.refresh()
-                ui.notify("Skip messages reset to default", type="info")
+                ui.notify("Shame messages reset to default", type="info")
 
             with ui.row().classes("w-full justify-between items-center gap-2 mt-2"):
                 ui.button("Reset to default", on_click=reset_defaults).props(
@@ -712,41 +714,32 @@ class DJPage:
                 ui.button("Save", on_click=save).props("color=primary")
         dialog.open()
 
-    def _open_paid_skip(self):
-        current = self.svc.get_currently_playing()
+    def _open_shame_delete(self, uid: str):
+        item = next((q for q in self.svc.get_queue() if q.uid == uid), None)
+        if item is None:
+            return
+        requester = item.requester or "no requester"
         with ui.dialog() as dialog, ui.card().classes("bg-gray-900 min-w-[320px]"):
-            ui.label("Paid skip").classes("text-lg font-bold")
-            if current:
-                victim = current.requester or "no requester"
-                ui.label(
-                    f"Skipping: {current.track_name} – {current.artist} "
-                    f"(requested by {victim})"
-                ).classes("text-sm text-gray-400")
-            else:
-                ui.label("Nothing is playing right now.").classes(
-                    "text-sm text-gray-400"
-                )
+            ui.label("💰 Shame delete").classes("text-lg font-bold")
+            ui.label(
+                f"Delete: {item.track_name} – {item.artist} (requested by {requester})"
+            ).classes("text-sm text-gray-400")
             name_input = ui.input(
-                placeholder="Who paid?",
+                placeholder="Who paid? (optional)",
                 autocomplete=self.svc.get_known_requesters(),
             ).classes("w-full")
 
             def confirm():
-                name = name_input.value.strip() if name_input.value else ""
-                if not name:
-                    return
-                self.svc.paid_skip(name)
-                self._refresh_all()
+                skipper = name_input.value.strip() if name_input.value else ""
+                self.svc.shame_delete(uid, skipper)
+                self._render_queue()
                 dialog.close()
 
             name_input.on("keydown.enter", confirm)
             with ui.row().classes("w-full justify-end gap-2 mt-2"):
                 ui.button("Cancel", on_click=dialog.close).props("flat color=grey")
-                ui.button("Skip it", on_click=confirm).props("color=primary")
+                ui.button("Shame & delete", on_click=confirm).props("color=negative")
         dialog.open()
-        # Dialog has an open transition (~300ms); the input isn't focusable
-        # until it's rendered and visible, so defer the focus past the animation.
-        ui.timer(0.3, lambda: name_input.run_method("focus"), once=True)
 
     def _confirm_clear_queue(self):
         count = len(self.svc.get_queue())
