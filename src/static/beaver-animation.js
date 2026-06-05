@@ -43,10 +43,32 @@ function triggerBeaverAnimation() {
     runBeaverDestroy(document.querySelector('.now-playing-wrapper'));
 }
 
-// Shame-delete: beaver destroys the specific queue row being removed.
+// Shame-delete: if the removed song is one of the always-visible prominent
+// cards, chomp it directly; otherwise the row may be off-screen / scrolling /
+// hidden, so the beaver attacks the whole COMING UP box instead.
 function triggerBeaverDeleteAnimation(uid) {
-    const row = document.querySelector('[data-uid="' + CSS.escape(uid) + '"]');
-    runBeaverDestroy(row);
+    const sel = '.prominent-cards [data-uid="' + CSS.escape(uid) + '"]';
+    const card = document.querySelector(sel);
+    if (card) {
+        runBeaverDestroy(card);
+        return;
+    }
+    runBeaverBoxAttack();
+}
+
+// Beaver attacks the scrolling queue box: pause the creep, shake + chomp the
+// region, then resume. Robust regardless of where the deleted row sat.
+function runBeaverBoxAttack() {
+    const region = document.querySelector('.scroll-region');
+    if (!region) return;
+    const track = document.querySelector('.scroll-track');
+    if (track) track.classList.add('paused');
+    region.classList.add('beaver-delete-target');
+    runBeaverDestroy(region);
+    setTimeout(() => {
+        region.classList.remove('beaver-delete-target');
+        if (track) track.classList.remove('paused');
+    }, 2200);
 }
 
 function triggerPriorityGlow() {
