@@ -1,0 +1,54 @@
+/* Auto-scrolling billboard for the audience /display page. */
+
+/* Clipped viewport for the scrolling queue tail. Height is a fraction of the
+   screen so now-playing + prominent cards stay visible above it. */
+.scroll-region {
+    overflow: hidden;
+    max-height: 46vh;
+    position: relative;
+}
+
+/* The track holds the real rows then a static clone (added by JS-managed
+   render). translateY(-50%) shifts exactly one copy => seamless loop. */
+.scroll-track {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Animation only applied when content overflows (class toggled from JS). */
+.scroll-track.scrolling {
+    animation-name: billboard-scroll;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    /* animation-duration is set inline from JS, proportional to row count. */
+}
+
+/* Touch/hover pause: never fight a phone viewer's manual reading. */
+.scroll-track.paused {
+    animation-play-state: paused;
+}
+
+@keyframes billboard-scroll {
+    from { transform: translateY(0); }
+    to   { transform: translateY(-50%); }
+}
+
+/* The static clone is visual filler for the loop seam; hide it when not
+   scrolling so a fitting queue isn't duplicated on screen. */
+.scroll-track:not(.scrolling) .scroll-clone {
+    display: none;
+}
+
+/* Soft fade at top & bottom edges so rows appear/vanish gracefully. */
+.scroll-region::before,
+.scroll-region::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 28px;
+    z-index: 2;
+    pointer-events: none;
+}
+.scroll-region::before { top: 0; background: linear-gradient(to bottom, rgba(13,13,26,0.9), transparent); }
+.scroll-region::after  { bottom: 0; background: linear-gradient(to top, rgba(13,13,26,0.9), transparent); }
