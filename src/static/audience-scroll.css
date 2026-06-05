@@ -4,7 +4,6 @@
    screen so now-playing + prominent cards stay visible above it. */
 .scroll-region {
     overflow: hidden;
-    max-height: 58vh;
     position: relative;
 }
 

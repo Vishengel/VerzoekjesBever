@@ -26,9 +26,16 @@ function updateAudienceScroll() {
     return;
   }
 
-  const durationSec = contentHeight / BILLBOARD_PX_PER_SEC;
-  track.style.animationDuration = durationSec.toFixed(2) + 's';
-  track.classList.add('scrolling');
+  // Only set the duration when (re)starting the scroll. Changing animation-*
+  // properties on a running animation RESTARTS it, snapping back to the top — a
+  // visible jump on every queue change. The -50% wrap is height-based so it
+  // stays seamless regardless; leaving duration fixed just lets the speed drift
+  // slightly as rows are added, which is imperceptible.
+  if (!track.classList.contains('scrolling')) {
+    const durationSec = contentHeight / BILLBOARD_PX_PER_SEC;
+    track.style.animationDuration = durationSec.toFixed(2) + 's';
+    track.classList.add('scrolling');
+  }
 }
 
 function setupAudienceScroll() {

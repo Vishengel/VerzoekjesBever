@@ -104,7 +104,12 @@ def audience_page():
     </style>
     """)
 
-    with ui.column().classes("w-full max-w-3xl mx-auto p-8 gap-6"):
+    # h-screen + overflow-hidden makes the billboard fill exactly the viewport;
+    # the scroll region flex-grows into the leftover space (below), so the page
+    # never scrolls and the COMING UP box — and its beaver — stay on screen.
+    with ui.column().classes(
+        "w-full max-w-3xl mx-auto p-8 gap-6 h-screen overflow-hidden"
+    ):
         # Compact horizontal brand bar (logo + title inline) frees vertical room
         # for the queue. Stays a slim strip on mobile — a true sidebar would be
         # too cramped on narrow phones.
@@ -204,7 +209,9 @@ def audience_page():
             ):
                 ui.image("/static/beaver.svg").classes("w-8 h-8")
 
-        scroll_region = ui.element("div").classes("scroll-region w-full")
+        scroll_region = ui.element("div").classes(
+            "scroll-region w-full flex-grow min-h-0"
+        )
         with scroll_region:
             scroll_track = ui.element("div").classes("scroll-track w-full")
             with scroll_track:
