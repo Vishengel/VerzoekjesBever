@@ -14,7 +14,7 @@ from models import (
 )
 from adem_mode import ADEM_MODE_QUEUE_SIZE, ADEMNOOD_ITEM
 from party_service import PartyService, detect_playback_signal
-from persistence import QueueStore, SkipTemplateStore
+from persistence import QueueStore, ShameTemplateStore
 
 
 def _make_item(
@@ -41,7 +41,7 @@ def store(tmp_path: Path):
 
 @pytest.fixture
 def skip_store(tmp_path: Path):
-    return SkipTemplateStore(tmp_path / "skip_templates.json")
+    return ShameTemplateStore(tmp_path / "shame_templates.json")
 
 
 @pytest.fixture

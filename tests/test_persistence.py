@@ -389,19 +389,19 @@ def test_party_end_time_corrupt_value_falls_back_to_none(tmp_path: Path):
     pytest.assume(store.party_end_time is None)
 
 
-def test_skip_templates_seeded_on_fresh_store(tmp_path):
-    from persistence import SkipTemplateStore
-    from models import DEFAULT_SKIP_TEMPLATES
+def test_shame_templates_seeded_on_fresh_store(tmp_path):
+    from persistence import ShameTemplateStore
+    from models import DEFAULT_SHAME_TEMPLATES
 
-    store = SkipTemplateStore(tmp_path / "skip_templates.json")
+    store = ShameTemplateStore(tmp_path / "shame_templates.json")
     texts = [t.text for t in store.get_all()]
-    pytest.assume(texts == DEFAULT_SKIP_TEMPLATES)
+    pytest.assume(texts == DEFAULT_SHAME_TEMPLATES)
 
 
-def test_skip_templates_add_and_remove(tmp_path):
-    from persistence import SkipTemplateStore
+def test_shame_templates_add_and_remove(tmp_path):
+    from persistence import ShameTemplateStore
 
-    store = SkipTemplateStore(tmp_path / "skip_templates.json")
+    store = ShameTemplateStore(tmp_path / "shame_templates.json")
     store.add("{skipper} loathes {artist}, sorry {victim}")
     added = [t for t in store.get_all() if "loathes" in t.text]
     pytest.assume(len(added) == 1)
@@ -411,42 +411,42 @@ def test_skip_templates_add_and_remove(tmp_path):
     pytest.assume(all(t.uid != uid for t in store.get_all()))
 
 
-def test_skip_templates_persist_and_deletion_not_resurrected(tmp_path):
-    from persistence import SkipTemplateStore
+def test_shame_templates_persist_and_deletion_not_resurrected(tmp_path):
+    from persistence import ShameTemplateStore
 
-    path = tmp_path / "skip_templates.json"
-    store = SkipTemplateStore(path)
+    path = tmp_path / "shame_templates.json"
+    store = ShameTemplateStore(path)
     for t in list(store.get_all()):
         store.remove(t.uid)
     pytest.assume(store.get_all() == [])
 
-    reloaded = SkipTemplateStore(path)
+    reloaded = ShameTemplateStore(path)
     pytest.assume(reloaded.get_all() == [])
 
 
-def test_skip_templates_survive_session_reset(tmp_path):
+def test_shame_templates_survive_session_reset(tmp_path):
     """Templates live in their own file, so starting a fresh session (a
     separate QueueStore) must not wipe them."""
-    from persistence import QueueStore, SkipTemplateStore
+    from persistence import QueueStore, ShameTemplateStore
 
-    skip_path = tmp_path / "skip_templates.json"
-    skip = SkipTemplateStore(skip_path)
+    skip_path = tmp_path / "shame_templates.json"
+    skip = ShameTemplateStore(skip_path)
     skip.add("{skipper} can't stand {artist}, sorry {victim}")
     custom_count = len(skip.get_all())
 
     session = QueueStore(tmp_path / "session.json")
     session.start_session("Party", "dev1")
 
-    reloaded = SkipTemplateStore(skip_path)
+    reloaded = ShameTemplateStore(skip_path)
     pytest.assume(len(reloaded.get_all()) == custom_count)
 
 
-def test_skip_templates_reset_to_default(tmp_path):
-    from persistence import SkipTemplateStore
-    from models import DEFAULT_SKIP_TEMPLATES
+def test_shame_templates_reset_to_default(tmp_path):
+    from persistence import ShameTemplateStore
+    from models import DEFAULT_SHAME_TEMPLATES
 
-    store = SkipTemplateStore(tmp_path / "skip_templates.json")
+    store = ShameTemplateStore(tmp_path / "shame_templates.json")
     store.add("a throwaway one")
     store.reset_to_default()
     texts = [t.text for t in store.get_all()]
-    pytest.assume(texts == DEFAULT_SKIP_TEMPLATES)
+    pytest.assume(texts == DEFAULT_SHAME_TEMPLATES)

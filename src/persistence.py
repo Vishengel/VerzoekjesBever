@@ -5,7 +5,7 @@ from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
 
-from models import DEFAULT_SKIP_TEMPLATES, PlaybackState, QueueItem, SkipMessageTemplate
+from models import DEFAULT_SHAME_TEMPLATES, PlaybackState, QueueItem, ShameTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -199,20 +199,20 @@ class QueueStore:
         tmp.replace(self._path)
 
 
-class SkipTemplateStore:
-    """Persists skip-message templates independently of the party session so
+class ShameTemplateStore:
+    """Persists shame-message templates independently of the party session so
     they outlive session resets. Seeds with defaults on first run."""
 
     def __init__(self, path: Path):
         self._path = path
-        self._templates: list[SkipMessageTemplate] = []
+        self._templates: list[ShameTemplate] = []
         self._load()
 
-    def get_all(self) -> list[SkipMessageTemplate]:
+    def get_all(self) -> list[ShameTemplate]:
         return list(self._templates)
 
     def add(self, text: str) -> None:
-        self._templates.append(SkipMessageTemplate(text=text))
+        self._templates.append(ShameTemplate(text=text))
         self._save()
 
     def remove(self, uid: str) -> None:
@@ -220,7 +220,7 @@ class SkipTemplateStore:
         self._save()
 
     def reset_to_default(self) -> None:
-        self._templates = [SkipMessageTemplate(text=t) for t in DEFAULT_SKIP_TEMPLATES]
+        self._templates = [ShameTemplate(text=t) for t in DEFAULT_SHAME_TEMPLATES]
         self._save()
 
     def _load(self) -> None:
@@ -232,12 +232,12 @@ class SkipTemplateStore:
             data = json.loads(self._path.read_text())
         except (json.JSONDecodeError, ValueError):
             logger.warning(
-                "Corrupt skip-templates file at %s, restoring defaults", self._path
+                "Corrupt shame-templates file at %s, restoring defaults", self._path
             )
             self.reset_to_default()
             return
         self._templates = [
-            SkipMessageTemplate.from_dict(t) for t in data.get("templates", [])
+            ShameTemplate.from_dict(t) for t in data.get("templates", [])
         ]
 
     def _save(self) -> None:
