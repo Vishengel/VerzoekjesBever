@@ -132,9 +132,35 @@ def audience_page():
                 ui.label("Check back soon!").classes("text-gray-500")
             return
 
-        # --- now-playing (gated rebuild) ---
-        np_container = ui.column().classes("w-full gap-0")
+        # --- now-playing (built once, patched in place) ---
+        # Both the playing card and the empty card are built up front and
+        # toggled by visibility. Patching labels/image in place (gated by song
+        # uid) avoids the clear+rebuild flash where the card briefly vanished.
         np_state = {"sig": object()}  # sentinel forces first render
+        with ui.column().classes("w-full gap-0"):
+            np_wrapper = ui.element("div").classes("now-playing-wrapper w-full")
+            with np_wrapper:
+                with ui.card().classes(
+                    "w-full bg-green-600 rounded-xl p-5 now-playing-card"
+                ):
+                    ui.label("NOW PLAYING").classes(
+                        "text-xs tracking-[0.2em] text-white/70"
+                    )
+                    with ui.row().classes("items-center gap-5 mt-2"):
+                        np_img = ui.image("").classes("w-20 h-20 rounded-lg")
+                        with ui.column().classes("gap-0"):
+                            np_track = ui.label("").classes(
+                                "text-2xl font-extrabold text-white"
+                            )
+                            np_artist = ui.label("").classes("text-lg text-white/85")
+                            np_req = ui.label("").classes("text-sm text-white/60 mt-1")
+            np_empty = ui.card().classes(
+                "w-full bg-gray-800 rounded-xl p-8 text-center"
+            )
+            with np_empty:
+                ui.image("/static/beaver.svg").classes("w-10 h-10 mx-auto")
+                ui.label("No song playing yet").classes("text-xl text-gray-400 mt-2")
+                ui.label("Make a request!").classes("text-gray-500")
 
         def render_now_playing():
             current = svc.get_currently_playing()
@@ -142,41 +168,17 @@ def audience_page():
             if sig == np_state["sig"]:
                 return
             np_state["sig"] = sig
-            np_container.clear()
-            with np_container:
-                if current:
-                    with ui.element("div").classes("now-playing-wrapper w-full"):
-                        with ui.card().classes(
-                            "w-full bg-green-600 rounded-xl p-5 now-playing-card"
-                        ):
-                            ui.label("NOW PLAYING").classes(
-                                "text-xs tracking-[0.2em] text-white/70"
-                            )
-                            with ui.row().classes("items-center gap-5 mt-2"):
-                                if current.album_art_url:
-                                    ui.image(current.album_art_url).classes(
-                                        "w-20 h-20 rounded-lg"
-                                    )
-                                with ui.column().classes("gap-0"):
-                                    ui.label(current.track_name).classes(
-                                        "text-2xl font-extrabold text-white"
-                                    )
-                                    ui.label(current.artist).classes(
-                                        "text-lg text-white/85"
-                                    )
-                                    if current.requester:
-                                        ui.label(
-                                            f"🎤 Requested by {current.requester}"
-                                        ).classes("text-sm text-white/60 mt-1")
-                else:
-                    with ui.card().classes(
-                        "w-full bg-gray-800 rounded-xl p-8 text-center"
-                    ):
-                        ui.image("/static/beaver.svg").classes("w-10 h-10 mx-auto")
-                        ui.label("No song playing yet").classes(
-                            "text-xl text-gray-400 mt-2"
-                        )
-                        ui.label("Make a request!").classes("text-gray-500")
+            if current:
+                np_img.set_source(current.album_art_url or "")
+                np_img.set_visibility(bool(current.album_art_url))
+                np_track.set_text(current.track_name)
+                np_artist.set_text(current.artist)
+                np_req.set_text(
+                    f"🎤 Requested by {current.requester}" if current.requester else ""
+                )
+                np_req.set_visibility(bool(current.requester))
+            np_wrapper.set_visibility(bool(current))
+            np_empty.set_visibility(not current)
 
         # --- UP NEXT header (patched) ---
         header_row = ui.row().classes("items-center justify-between mt-4 w-full")
@@ -215,13 +217,19 @@ def audience_page():
         with scroll_region:
             scroll_track = ui.element("div").classes("scroll-track w-full")
             with scroll_track:
-                # live, patched rows (one copy) + loop marker
+                # Two equal halves: the live rows + a duplicate, each capped by a
+                # loop marker. The JS scrolls scroll-top by pixels and wraps after
+                # one half (.scroll-real height), so the clone makes the loop
+                # seamless. Both halves are KeyedLists patched in place — no
+                # clear/rebuild flash, and pixel scrolling is insert-stable.
                 real_wrap = ui.element("div").classes("scroll-real w-full")
                 with real_wrap:
                     list_container = ui.column().classes("w-full gap-0")
                     _loop_marker()
-                # static clone for the seamless loop seam (rebuilt each render)
-                clone_container = ui.element("div").classes("scroll-clone w-full")
+                clone_wrap = ui.element("div").classes("scroll-clone w-full")
+                with clone_wrap:
+                    clone_container = ui.column().classes("w-full gap-0")
+                    _loop_marker()
         more_label = ui.label("").classes("text-center text-gray-500 text-sm py-2")
 
         # NOTE: leading "nicegui-row" is the framework's default flex class
@@ -296,6 +304,15 @@ def audience_page():
 
         queue_list = KeyedList(
             list_container,
+            key=lambda vm: vm.uid,
+            build=_build_row,
+            patch=_patch_row,
+        )
+        # Clone half: same rows, same builder/patcher, its own container. Patched
+        # in place each render (no clear/rebuild flash) so the seamless-loop seam
+        # always matches the live half.
+        clone_list = KeyedList(
+            clone_container,
             key=lambda vm: vm.uid,
             build=_build_row,
             patch=_patch_row,
@@ -378,49 +395,6 @@ def audience_page():
             patch=_patch_prom,
         )
 
-        clone_state = {"sig": None}
-
-        def _rebuild_clone(scroll_vms: list[AudienceRowVM]) -> None:
-            """Static (non-patched) duplicate of the scroll rows for the loop seam."""
-            sig = [
-                (vm.uid, vm.position, vm.eta_ms, vm.track_name, vm.artist)
-                for vm in scroll_vms
-            ]
-            if sig == clone_state["sig"]:
-                return
-            clone_state["sig"] = sig
-            clone_container.clear()
-            with clone_container:
-                for i, vm in enumerate(scroll_vms):
-                    row_cls = BASE_ROW + (
-                        "" if i == len(scroll_vms) - 1 else " border-b border-white/5"
-                    )
-                    with ui.row().classes(row_cls):
-                        ui.label(str(vm.position)).classes(
-                            "text-green-400 font-extrabold text-lg w-7 text-center"
-                        )
-                        if vm.thumb_url:
-                            ui.image(vm.thumb_url).classes(
-                                "w-11 h-11 rounded-md"
-                            ).props("loading=lazy")
-                        with ui.column().classes("flex-grow gap-0"):
-                            ui.label(vm.track_name).classes(
-                                "text-white font-semibold text-base"
-                            )
-                            ui.label(vm.artist).classes("text-gray-400 text-sm")
-                        eta_cls = ETA_NEXT if vm.eta_ms == 0 else ETA_WAIT
-                        eta_txt = (
-                            "Up next"
-                            if vm.eta_ms == 0
-                            else "ETA "
-                            + format_clock_eta(
-                                svc.get_current_remaining_ms() + vm.eta_ms,
-                                datetime.now(),
-                            )
-                        )
-                        ui.label(eta_txt).classes(eta_cls)
-                _loop_marker()
-
         def render_queue():
             queue = svc.get_queue()
             stats_label.set_text(
@@ -435,7 +409,7 @@ def audience_page():
             prominent_vms, scroll_vms = split_audience_vms(vms)
             prominent_list.reconcile(prominent_vms)
             queue_list.reconcile(scroll_vms)
-            _rebuild_clone(scroll_vms)
+            clone_list.reconcile(scroll_vms)
 
             has_scroll = bool(scroll_vms)
             coming_up_header.set_visibility(has_scroll)

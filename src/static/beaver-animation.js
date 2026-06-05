@@ -61,13 +61,12 @@ function triggerBeaverDeleteAnimation(uid) {
 function runBeaverBoxAttack() {
     const region = document.querySelector('.scroll-region');
     if (!region) return;
-    const track = document.querySelector('.scroll-track');
-    if (track) track.classList.add('paused');
+    pauseAudienceScroll();
     region.classList.add('beaver-delete-target');
     runBeaverDestroy(region);
     setTimeout(() => {
         region.classList.remove('beaver-delete-target');
-        if (track) track.classList.remove('paused');
+        resumeAudienceScroll();
     }, 2200);
 }
 
@@ -145,8 +144,7 @@ function triggerBeaverBoxAdd() {
     const region = document.querySelector('.scroll-region');
     if (!region) { triggerBeaverPromote(); return; }  // tiny queue: no box
 
-    const track = document.querySelector('.scroll-track');
-    if (track) track.classList.add('paused');
+    pauseAudienceScroll();
 
     const existing = region.querySelector('.beaver-add-overlay');
     if (existing) existing.remove();
@@ -168,7 +166,7 @@ function triggerBeaverBoxAdd() {
     setTimeout(function() {
         region.classList.remove('box-add');
         overlay.remove();
-        if (track) track.classList.remove('paused');
+        resumeAudienceScroll();
     }, 2400);
 }
 

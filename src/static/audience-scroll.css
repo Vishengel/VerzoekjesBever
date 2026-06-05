@@ -7,33 +7,17 @@
     position: relative;
 }
 
-/* The track holds the real rows then a static clone (added by JS-managed
-   render). translateY(-50%) shifts exactly one copy => seamless loop. */
+/* The track holds the real rows then an equal-height clone. The JS scrolls the
+   region by pixels and wraps after one half, so the clone makes the loop
+   seamless. The ".scrolling" class is toggled from JS (on when content
+   overflows) purely to hide the clone + marker when there's no seam to show. */
 .scroll-track {
     display: flex;
     flex-direction: column;
 }
 
-/* Animation only applied when content overflows (class toggled from JS). */
-.scroll-track.scrolling {
-    animation-name: billboard-scroll;
-    animation-timing-function: linear;
-    animation-iteration-count: infinite;
-    /* animation-duration is set inline from JS, proportional to row count. */
-}
-
-/* Touch/hover pause: never fight a phone viewer's manual reading. */
-.scroll-track.paused {
-    animation-play-state: paused;
-}
-
-@keyframes billboard-scroll {
-    from { transform: translateY(0); }
-    to   { transform: translateY(-50%); }
-}
-
-/* The static clone is visual filler for the loop seam; hide it when not
-   scrolling so a fitting queue isn't duplicated on screen. */
+/* The clone is the loop-seam filler; hide it when not scrolling so a fitting
+   queue isn't shown twice. */
 .scroll-track:not(.scrolling) .scroll-clone {
     display: none;
 }
