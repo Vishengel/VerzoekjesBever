@@ -8,6 +8,7 @@ from models import (
     format_queue_stats,
     format_clock_eta,
     select_album_art,
+    queue_fits,
 )
 import pytest
 
@@ -333,3 +334,35 @@ def test_filter_queue_no_match():
 def test_filter_queue_whitespace_term_returns_all():
     queue = [_item(track_name="A"), _item(track_name="B")]
     pytest.assume(len(filter_queue_with_positions(queue, "   ")) == 2)
+
+
+def test_queue_fits_none_end_always_true():
+    pytest.assume(
+        queue_fits(None, datetime(2026, 6, 5, 23, 0), 999_999, [], 999_999) is True
+    )
+
+
+def test_queue_fits_empty_queue_within_limit():
+    now = datetime(2026, 6, 5, 23, 0)
+    end = datetime(2026, 6, 5, 23, 30)
+    pytest.assume(queue_fits(end, now, 0, [], 10 * 60_000) is True)
+
+
+def test_queue_fits_exact_boundary_is_true():
+    now = datetime(2026, 6, 5, 23, 0)
+    end = datetime(2026, 6, 5, 23, 30)
+    pytest.assume(queue_fits(end, now, 0, [], 30 * 60_000) is True)
+
+
+def test_queue_fits_overrun_is_false():
+    now = datetime(2026, 6, 5, 23, 0)
+    end = datetime(2026, 6, 5, 23, 30)
+    pytest.assume(queue_fits(end, now, 0, [], 31 * 60_000) is False)
+
+
+def test_queue_fits_counts_current_remaining_and_queue():
+    now = datetime(2026, 6, 5, 23, 0)
+    end = datetime(2026, 6, 5, 23, 30)
+    q = [_item(track_name="A", duration_ms=10 * 60_000)]
+    pytest.assume(queue_fits(end, now, 10 * 60_000, q, 11 * 60_000) is False)
+    pytest.assume(queue_fits(end, now, 10 * 60_000, q, 9 * 60_000) is True)

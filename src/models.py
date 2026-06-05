@@ -205,6 +205,31 @@ def format_clock_eta(eta_ms: int, now: datetime) -> str:
     return (now + timedelta(milliseconds=eta_ms)).strftime("%H:%M")
 
 
+def queue_fits(
+    end_time: datetime | None,
+    now: datetime,
+    current_remaining_ms: int,
+    queue: list[QueueItem],
+    candidate_duration_ms: int,
+) -> bool:
+    """True when adding a ``candidate_duration_ms`` song keeps the queue's
+    projected finish at or before ``end_time``.
+
+    Projected finish = ``now`` + ``current_remaining_ms`` (the current track) +
+    the sum of queued durations. The candidate fits when that finish, plus its
+    own duration, does not exceed ``end_time``. ``end_time`` of ``None`` means no
+    limit (always fits). The boundary is inclusive (``<=``).
+    """
+    if end_time is None:
+        return True
+    total_ms = (
+        current_remaining_ms
+        + sum(item.duration_ms for item in queue)
+        + candidate_duration_ms
+    )
+    return now + timedelta(milliseconds=total_ms) <= end_time
+
+
 def format_queue_stats(queue: list[QueueItem]) -> str:
     """One-line queue summary: song count plus total remaining time when known."""
     total_ms = sum(item.duration_ms for item in queue)
