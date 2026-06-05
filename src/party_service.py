@@ -149,6 +149,7 @@ class PartyService:
         *,
         is_priority: bool = False,
         message: str | None = None,
+        uid: str | None = None,
     ) -> None:
         self._events.append(
             PartyEvent(
@@ -157,6 +158,7 @@ class PartyService:
                 version=self._version,
                 is_priority=is_priority,
                 message=message,
+                uid=uid,
             )
         )
         if len(self._events) > self.MAX_EVENTS:
@@ -337,7 +339,9 @@ class PartyService:
         message = self._build_shame_message(skipper, item)
         self._store.remove_from_queue(uid)
         self._bump_version()
-        self._emit(PartyEventType.SHAME_DELETE, item.track_uri, message=message)
+        self._emit(
+            PartyEventType.SHAME_DELETE, item.track_uri, message=message, uid=uid
+        )
 
     def _build_shame_message(self, skipper: str, item: QueueItem) -> str | None:
         if not self._shame_messages_enabled:

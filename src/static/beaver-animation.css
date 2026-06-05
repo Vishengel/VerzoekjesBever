@@ -104,6 +104,22 @@
     animation: bat-card-shatter 2s ease-in-out forwards;
 }
 
+/* Shame-delete: the chomp/bat destroy runs on the queue row itself.
+   The row is both the overlay anchor and the shake target (no inner card),
+   so the card-shake keyframes hook onto a compound class instead of a child. */
+.beaver-delete-target {
+    position: relative;
+    overflow: visible;
+}
+
+.beaver-chomp.beaver-delete-target {
+    animation: chomp-card-shake 2s ease-in-out forwards;
+}
+
+.beaver-bat.beaver-delete-target {
+    animation: bat-card-shatter 2s ease-in-out forwards;
+}
+
 /* ── Queue-add animation ─────────────────────────── */
 
 .beaver-incoming {

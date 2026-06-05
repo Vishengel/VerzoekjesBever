@@ -188,7 +188,13 @@ def audience_page():
         # added by ui.row()'s constructor. Without "nicegui-row" here the row
         # collapses to a block and children stack vertically. Any new structural
         # default class must be added to BASE_ROW too, or replace= will nuke it.
-        BASE_ROW = "nicegui-row items-center gap-3 px-4 py-3 w-full"
+        # "beaver-delete-target" gives the row position:relative so the chomp
+        # overlay can absolutely-position itself over the row being shame-deleted.
+        # Like nicegui-row, it lives in BASE_ROW because _patch_row's
+        # .classes(replace=...) wipes anything not re-listed here.
+        BASE_ROW = (
+            "nicegui-row items-center gap-3 px-4 py-3 w-full beaver-delete-target"
+        )
         ETA_NEXT = (
             "text-green-400 font-bold text-sm whitespace-nowrap ml-auto "
             "bg-white/5 rounded-full px-3 py-1 w-28 text-center"
@@ -247,6 +253,7 @@ def audience_page():
             wrapper = ui.element("div").classes("w-full")
             with wrapper:
                 row = ui.row().classes(BASE_ROW)
+                row.props(f'data-uid="{vm.uid}"')
                 with row:
                     pos = ui.label(str(vm.position)).classes(
                         "text-green-400 font-extrabold text-lg w-7 text-center"
@@ -434,8 +441,10 @@ def audience_page():
                     await asyncio.sleep(2.2)
 
                 if event.kind == PartyEventType.SHAME_DELETE:
-                    if svc.beaver_enabled:
-                        await ui.run_javascript("triggerBeaverAnimation()")
+                    if svc.beaver_enabled and event.uid:
+                        await ui.run_javascript(
+                            f"triggerBeaverDeleteAnimation({json.dumps(event.uid)})"
+                        )
                         await asyncio.sleep(2.2)
                     if event.message:
                         await ui.run_javascript(

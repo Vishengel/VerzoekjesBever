@@ -1,5 +1,7 @@
-function triggerBeaverAnimation() {
-    const wrapper = document.querySelector('.now-playing-wrapper');
+// Run a chomp/bat "destroy" animation over `wrapper`. The wrapper must be
+// position:relative (the overlay is absolute inset:0) and carry the card-shake
+// target class the CSS keyframes hook onto.
+function runBeaverDestroy(wrapper) {
     if (!wrapper) return;
 
     const existing = wrapper.querySelector('.beaver-overlay');
@@ -34,6 +36,17 @@ function triggerBeaverAnimation() {
         overlay.remove();
         wrapper.classList.remove(pick);
     }, 2200);
+}
+
+// Skip: beaver destroys the now-playing card (the track that just left).
+function triggerBeaverAnimation() {
+    runBeaverDestroy(document.querySelector('.now-playing-wrapper'));
+}
+
+// Shame-delete: beaver destroys the specific queue row being removed.
+function triggerBeaverDeleteAnimation(uid) {
+    const row = document.querySelector('[data-uid="' + CSS.escape(uid) + '"]');
+    runBeaverDestroy(row);
 }
 
 function triggerPriorityGlow() {

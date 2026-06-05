@@ -1135,6 +1135,21 @@ def test_shame_delete_removes_item_and_emits_message(service):
     pytest.assume(msg == "Jelle removed Africa by Toto from Dorieke")
 
 
+def test_shame_delete_event_carries_target_uid(service):
+    # The audience page targets the beaver-destroy animation at the deleted
+    # row by uid, so the event must carry the uid that was removed (not the
+    # now-playing track). track_uri is not unique across duplicate requests.
+    _seed_queue(service, requester="Dorieke")
+    target = service.get_queue()[0]
+    v = service.version
+    service.shame_delete(target.uid, skipper="Jelle")
+    events = [
+        e for e in service.get_events_since(v) if e.kind == PartyEventType.SHAME_DELETE
+    ]
+    pytest.assume(len(events) == 1)
+    pytest.assume(events[0].uid == target.uid)
+
+
 def test_shame_delete_does_not_touch_playback(service):
     _seed_queue(service)
     service.play_next()  # "Africa" becomes currently-playing, "Next" stays queued

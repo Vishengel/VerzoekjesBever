@@ -36,6 +36,7 @@ class PartyEvent:
     version: int
     is_priority: bool = False
     message: str | None = None
+    uid: str | None = None  # queue-row id; set for row-targeted events (SHAME_DELETE)
 
 
 @dataclass(frozen=True)
