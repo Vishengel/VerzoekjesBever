@@ -4,6 +4,8 @@ from enum import StrEnum
 from uuid import uuid4
 
 ANONYMOUS_REQUESTER = "🦫 (anonymous)"
+# Short display form of the anonymous sentinel; derived so the two never drift.
+ANONYMOUS_DISPLAY = ANONYMOUS_REQUESTER.split(" ")[0]
 
 
 class PlaybackState(StrEnum):
@@ -24,7 +26,7 @@ class PartyEventType(StrEnum):
     ADDED = "added"
     SKIPPED = "skipped"
     MOVED_TO_TOP = "moved_to_top"
-    PAID_SKIP = "paid_skip"
+    SHAME_DELETE = "shame_delete"
 
 
 @dataclass(frozen=True)
@@ -278,12 +280,14 @@ def format_queue_stats(queue: list[QueueItem]) -> str:
     return stats
 
 
-def render_skip_message(
-    template_text: str, skipper: str, victim: str, artist: str
+def render_shame_message(
+    template_text: str, skipper: str, victim: str, artist: str, song: str
 ) -> str:
-    display_victim = "🦫" if victim == ANONYMOUS_REQUESTER else victim
+    display_victim = ANONYMOUS_DISPLAY if victim == ANONYMOUS_REQUESTER else victim
+    display_skipper = ANONYMOUS_DISPLAY if skipper == ANONYMOUS_REQUESTER else skipper
     return (
         template_text.replace("{victim}", display_victim)
-        .replace("{skipper}", skipper)
+        .replace("{skipper}", display_skipper)
         .replace("{artist}", artist)
+        .replace("{song}", song)
     )

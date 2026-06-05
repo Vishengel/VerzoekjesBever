@@ -10,6 +10,9 @@ from models import (
     select_album_art,
     queue_fits,
     resolve_party_end,
+    render_shame_message,
+    ANONYMOUS_DISPLAY,
+    ANONYMOUS_REQUESTER,
 )
 import pytest
 
@@ -414,53 +417,61 @@ def test_resolve_party_end_rejects_malformed():
         resolve_party_end("not-a-time", datetime(2026, 6, 5, 20, 0))
 
 
-def test_render_skip_message_named_victim():
-    from models import render_skip_message
-
-    msg = render_skip_message(
-        "Sorry {victim}, {skipper} hates {artist}",
-        skipper="Jelle",
-        victim="Dorieke",
-        artist="Toto",
-    )
-    pytest.assume(msg == "Sorry Dorieke, Jelle hates Toto")
-
-
-def test_render_skip_message_anonymous_victim():
-    from models import ANONYMOUS_REQUESTER, render_skip_message
-
-    msg = render_skip_message(
-        "Sorry {victim}, {skipper} hates {artist}",
-        skipper="Jelle",
-        victim=ANONYMOUS_REQUESTER,
-        artist="Toto",
-    )
-    pytest.assume(msg == "Sorry 🦫, Jelle hates Toto")
-
-
-def test_render_skip_message_ignores_stray_braces():
-    from models import render_skip_message
-
-    msg = render_skip_message(
+def test_render_shame_message_ignores_stray_braces():
+    msg = render_shame_message(
         "100% {sure}: {skipper} hates {artist}",
         skipper="Jelle",
         victim="Dorieke",
         artist="Toto",
+        song="Africa",
     )
     pytest.assume(msg == "100% {sure}: Jelle hates Toto")
 
 
-def test_party_event_message_defaults_none_and_paid_skip_exists():
+def test_party_event_message_defaults_none_and_shame_delete_exists():
     from models import PartyEvent, PartyEventType
 
     e = PartyEvent(kind=PartyEventType.SKIPPED, track_uri="spotify:track:x", version=1)
     pytest.assume(e.message is None)
 
-    paid = PartyEvent(
-        kind=PartyEventType.PAID_SKIP,
+    shame = PartyEvent(
+        kind=PartyEventType.SHAME_DELETE,
         track_uri="spotify:track:y",
         version=2,
         message="Sorry 🦫, Jelle hates Toto",
     )
-    pytest.assume(paid.kind == "paid_skip")
-    pytest.assume(paid.message == "Sorry 🦫, Jelle hates Toto")
+    pytest.assume(shame.kind == "shame_delete")
+    pytest.assume(shame.message == "Sorry 🦫, Jelle hates Toto")
+
+
+def test_render_shame_message_replaces_all_placeholders():
+    out = render_shame_message(
+        "{skipper} deleted {song} by {artist} — sorry {victim}",
+        skipper="Bob",
+        victim="Alice",
+        artist="Queen",
+        song="Bohemian Rhapsody",
+    )
+    pytest.assume(out == "Bob deleted Bohemian Rhapsody by Queen — sorry Alice")
+
+
+def test_render_shame_message_template_without_song_placeholder():
+    out = render_shame_message(
+        "{skipper} hates {artist}",
+        skipper="Bob",
+        victim="Alice",
+        artist="Queen",
+        song="Whatever",
+    )
+    pytest.assume(out == "Bob hates Queen")
+
+
+def test_render_shame_message_anonymous_victim_and_skipper():
+    out = render_shame_message(
+        "{skipper} deleted {victim}'s song",
+        skipper=ANONYMOUS_REQUESTER,
+        victim=ANONYMOUS_REQUESTER,
+        artist="Queen",
+        song="X",
+    )
+    pytest.assume(out == f"{ANONYMOUS_DISPLAY} deleted {ANONYMOUS_DISPLAY}'s song")
