@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from spotipy.exceptions import SpotifyException
@@ -14,6 +15,8 @@ from models import (
     PlaybackSignal,
     PlaybackState,
     QueueItem,
+    queue_fits,
+    resolve_party_end,
 )
 from persistence import QueueStore
 
@@ -185,11 +188,36 @@ class PartyService:
     def search_songs(self, query: str) -> list[QueueItem]:
         return self._spotify.search_tracks(query)
 
-    def add_to_queue(self, item: QueueItem, top: bool = False) -> None:
+    def get_party_end(self) -> datetime | None:
+        return self._store.party_end_time
+
+    def set_party_end(self, hhmm: str) -> datetime:
+        end_time = resolve_party_end(hhmm, datetime.now())
+        self._store.set_party_end_time(end_time)
+        self._bump_version()
+        return end_time
+
+    def clear_party_end(self) -> None:
+        self._store.set_party_end_time(None)
+        self._bump_version()
+
+    def can_fit(self, candidate_duration_ms: int) -> bool:
+        return queue_fits(
+            self._store.party_end_time,
+            datetime.now(),
+            self.get_current_remaining_ms(),
+            self._store.queue,
+            candidate_duration_ms,
+        )
+
+    def add_to_queue(self, item: QueueItem, top: bool = False) -> bool:
+        if not self.can_fit(item.duration_ms):
+            return False
         self._adem.on_user_add()
         self._store.add_to_queue(item, top=top)
         self._bump_version()
         self._emit(PartyEventType.ADDED, item.track_uri, is_priority=top)
+        return True
 
     def remove_from_queue(self, uid: str) -> None:
         self._store.remove_from_queue(uid)

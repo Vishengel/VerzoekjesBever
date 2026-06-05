@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -986,3 +987,52 @@ def test_signal_paused_and_we_think_paused():
         in_settle_period=False,
     )
     pytest.assume(result == PlaybackSignal.NOTHING)
+
+
+# --- Party-end time enforcement ---
+
+
+def _long_song(uri="spotify:track:long", minutes=5) -> QueueItem:
+    return QueueItem(
+        track_name="Long",
+        artist="A",
+        album_art_url="",
+        requester="",
+        track_uri=uri,
+        duration_ms=minutes * 60_000,
+    )
+
+
+def test_add_to_queue_returns_true_when_no_limit(service):
+    ok = service.add_to_queue(_make_item())
+    pytest.assume(ok is True)
+    pytest.assume(len(service.get_queue()) == 1)
+
+
+def test_add_to_queue_rejected_when_over_end_time(service, store):
+    store.set_party_end_time(datetime.now() + timedelta(minutes=1))
+    ok = service.add_to_queue(_long_song(minutes=5))
+    pytest.assume(ok is False)
+    pytest.assume(service.get_queue() == [])
+
+
+def test_rejected_add_does_not_bump_version(service, store):
+    store.set_party_end_time(datetime.now() + timedelta(minutes=1))
+    before = service.version
+    service.add_to_queue(_long_song(minutes=5))
+    pytest.assume(service.version == before)
+
+
+def test_add_within_end_time_succeeds(service, store):
+    store.set_party_end_time(datetime.now() + timedelta(hours=2))
+    ok = service.add_to_queue(_long_song(minutes=5))
+    pytest.assume(ok is True)
+    pytest.assume(len(service.get_queue()) == 1)
+
+
+def test_set_and_clear_party_end(service):
+    resolved = service.set_party_end("23:30")
+    pytest.assume(resolved.hour == 23 and resolved.minute == 30)
+    pytest.assume(service.get_party_end() == resolved)
+    service.clear_party_end()
+    pytest.assume(service.get_party_end() is None)
