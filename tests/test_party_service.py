@@ -1036,3 +1036,15 @@ def test_set_and_clear_party_end(service):
     pytest.assume(service.get_party_end() == resolved)
     service.clear_party_end()
     pytest.assume(service.get_party_end() is None)
+
+
+def test_adem_fill_capped_by_end_time(service, store):
+    # Ademnood is 3.5 min each; a 10-min window fits 2 (7m), not a 3rd (10.5m).
+    store.set_party_end_time(datetime.now() + timedelta(minutes=10))
+    service.start_session("Party", "dev1", adem_mode=True)
+    pytest.assume(len(service.get_queue()) == 2)
+
+
+def test_adem_fill_unlimited_without_end_time(service):
+    service.start_session("Party", "dev1", adem_mode=True)
+    pytest.assume(len(service.get_queue()) == ADEM_MODE_QUEUE_SIZE)

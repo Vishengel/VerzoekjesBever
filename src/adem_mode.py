@@ -7,14 +7,19 @@ from models import QueueItem
 if TYPE_CHECKING:
     from persistence import QueueStore
 
+ADEMNOOD_DURATION_MS = (
+    210_000  # real track length (~3:30); makes the end-time cap meaningful
+)
+ADEM_MODE_QUEUE_SIZE = 50
+
 ADEMNOOD_ITEM = QueueItem(
     track_name="Ademnood",
     artist="Linda Roos & Jessica",
     album_art_url="https://i.scdn.co/image/ab67616d0000b273eadf932fba8bf38eba3947a1",
     track_uri="spotify:track:5ljuGR6Fv7B2mviKflDoE4",
     requester="🦫",
+    duration_ms=ADEMNOOD_DURATION_MS,
 )
-ADEM_MODE_QUEUE_SIZE = 50
 
 
 class AdemMode:
@@ -25,8 +30,10 @@ class AdemMode:
     def active(self) -> bool:
         return self._store.adem_mode_active
 
-    def activate(self) -> None:
+    def activate(self, fits=None) -> None:
         for _ in range(ADEM_MODE_QUEUE_SIZE):
+            if fits is not None and not fits(ADEMNOOD_ITEM):
+                break
             self._store.add_to_queue(ADEMNOOD_ITEM)
         self._store.set_adem_mode_active(True)
 
@@ -40,8 +47,8 @@ class AdemMode:
         ):
             self._store.clear_queue()
 
-    def refill_if_needed(self) -> bool:
+    def refill_if_needed(self, fits=None) -> bool:
         if self.active and not self._store.queue:
-            self.activate()
+            self.activate(fits)
             return True
         return False

@@ -173,10 +173,13 @@ class PartyService:
         self._show_qr_code = enabled
         self._bump_version()
 
+    def _adem_fits(self, candidate: QueueItem) -> bool:
+        return self.can_fit(candidate.duration_ms)
+
     def start_session(self, name: str, device_id: str, adem_mode: bool = False) -> None:
         self._store.start_session(name, device_id)
         if adem_mode:
-            self._adem.activate()
+            self._adem.activate(self._adem_fits)
         self._bump_version()
 
     def fill_benchmark_queue(self, items: list[QueueItem]) -> None:
@@ -366,7 +369,7 @@ class PartyService:
         self._refill_adem_if_needed()
 
     def _refill_adem_if_needed(self) -> None:
-        if self._adem.refill_if_needed():
+        if self._adem.refill_if_needed(self._adem_fits):
             self._bump_version()
 
     def _advance_queue(self) -> None:
