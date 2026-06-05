@@ -111,12 +111,12 @@ function triggerBeaverAddAnimation(isPriority) {
     }
 }
 
-function triggerPaidSkipOverlay(message) {
-    var existing = document.querySelector('.paid-skip-overlay');
+function triggerShameOverlay(message) {
+    var existing = document.querySelector('.shame-overlay');
     if (existing) existing.remove();
 
     var overlay = document.createElement('div');
-    overlay.className = 'paid-skip-overlay';
+    overlay.className = 'shame-overlay';
     overlay.textContent = message;
     overlay.style.position = 'fixed';
     overlay.style.top = '0';

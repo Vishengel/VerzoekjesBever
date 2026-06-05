@@ -421,13 +421,13 @@ def audience_page():
                     await ui.run_javascript("triggerBeaverAnimation()")
                     await asyncio.sleep(2.2)
 
-                if event.kind == PartyEventType.PAID_SKIP:
+                if event.kind == PartyEventType.SHAME_DELETE:
                     if svc.beaver_enabled:
                         await ui.run_javascript("triggerBeaverAnimation()")
                         await asyncio.sleep(2.2)
                     if event.message:
                         await ui.run_javascript(
-                            f"triggerPaidSkipOverlay({json.dumps(event.message)})"
+                            f"triggerShameOverlay({json.dumps(event.message)})"
                         )
                         await asyncio.sleep(6)
 
