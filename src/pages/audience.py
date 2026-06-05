@@ -35,6 +35,9 @@ class AudienceRowVM:
     is_glow: bool  # priority-glow animation target (pending_glow)
 
 
+PROMINENT_COUNT = 3
+
+
 def audience_row_vms(
     queue: list,
     *,
@@ -68,6 +71,18 @@ def audience_row_vms(
             )
         )
     return vms
+
+
+def split_audience_vms(
+    vms: list[AudienceRowVM],
+) -> tuple[list[AudienceRowVM], list[AudienceRowVM]]:
+    """Split windowed row VMs into the prominent head and the scrolling tail.
+
+    The first ``PROMINENT_COUNT`` rows (queue #1-3) render as large cards; the
+    rest scroll. ``is_last`` on the VMs is computed against the full window, so
+    the scroll tail's own last-row border is handled separately at render time.
+    """
+    return vms[:PROMINENT_COUNT], vms[PROMINENT_COUNT:]
 
 
 def _get_local_ip() -> str:

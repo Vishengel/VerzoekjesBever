@@ -1,7 +1,12 @@
 import pytest
 
 from models import QueueItem
-from pages.audience import AudienceRowVM, audience_row_vms
+from pages.audience import (
+    PROMINENT_COUNT,
+    AudienceRowVM,
+    audience_row_vms,
+    split_audience_vms,
+)
 
 
 def _item(uid, uri="spotify:track:x", req="", dur=60000):
@@ -53,3 +58,28 @@ def test_is_target_wins_when_uri_matches_both():
     )
     pytest.assume(vms[0].is_target is True)
     pytest.assume(vms[0].is_glow is False)
+
+
+def test_split_separates_prominent_and_scroll():
+    q = [_item(str(i)) for i in range(10)]
+    vms = audience_row_vms(q, window=30, pending_add_uri=None, pending_glow_uri=None)
+    prominent, scroll = split_audience_vms(vms)
+    pytest.assume(PROMINENT_COUNT == 3)
+    pytest.assume([v.uid for v in prominent] == ["0", "1", "2"])
+    pytest.assume([v.uid for v in scroll] == [str(i) for i in range(3, 10)])
+
+
+def test_split_small_queue_has_no_scroll():
+    q = [_item(str(i)) for i in range(2)]
+    vms = audience_row_vms(q, window=30, pending_add_uri=None, pending_glow_uri=None)
+    prominent, scroll = split_audience_vms(vms)
+    pytest.assume([v.uid for v in prominent] == ["0", "1"])
+    pytest.assume(scroll == [])
+
+
+def test_split_exactly_prominent_count():
+    q = [_item(str(i)) for i in range(3)]
+    vms = audience_row_vms(q, window=30, pending_add_uri=None, pending_glow_uri=None)
+    prominent, scroll = split_audience_vms(vms)
+    pytest.assume(len(prominent) == 3)
+    pytest.assume(scroll == [])
