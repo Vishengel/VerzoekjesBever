@@ -1016,6 +1016,14 @@ def test_add_to_queue_rejected_when_over_end_time(service, store):
     pytest.assume(service.get_queue() == [])
 
 
+def test_priority_add_rejected_when_over_end_time(service, store):
+    # top=True must be gated too; position doesn't change the duration math.
+    store.set_party_end_time(datetime.now() + timedelta(minutes=1))
+    ok = service.add_to_queue(_long_song(minutes=5), top=True)
+    pytest.assume(ok is False)
+    pytest.assume(service.get_queue() == [])
+
+
 def test_rejected_add_does_not_bump_version(service, store):
     store.set_party_end_time(datetime.now() + timedelta(minutes=1))
     before = service.version
