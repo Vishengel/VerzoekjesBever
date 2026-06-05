@@ -55,3 +55,16 @@
 
 /* During a delete attack the beaver overlay must sit above the edge fades. */
 .scroll-region.beaver-delete-target .beaver-overlay { z-index: 5; }
+
+/* Loop marker: a faint beaver divider that scrolls past once per cycle to
+   punctuate the seam. Shown only while scrolling (a static queue has no seam). */
+.loop-marker { opacity: 0.4; }
+.scroll-track:not(.scrolling) .loop-marker { display: none; }
+.loop-marker::before,
+.loop-marker::after {
+    content: "";
+    height: 1px;
+    width: 64px;
+    background: rgba(255, 255, 255, 0.18);
+    margin: 0 16px;
+}

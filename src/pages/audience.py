@@ -201,14 +201,26 @@ def audience_page():
         coming_up_header = ui.label("COMING UP").classes(
             "text-xs font-bold tracking-[0.2em] text-green-400/50 mt-3"
         )
+
+        def _loop_marker() -> None:
+            # Beaver divider that scrolls past once per loop, punctuating the
+            # seam where the last song wraps back to the top. Lives at the end
+            # of BOTH halves (real + clone) so the -50% wrap stays seamless;
+            # CSS hides it when the queue isn't scrolling.
+            with ui.row().classes(
+                "loop-marker items-center justify-center py-5 w-full"
+            ):
+                ui.image("/static/beaver.svg").classes("w-8 h-8")
+
         scroll_region = ui.element("div").classes("scroll-region w-full")
         with scroll_region:
             scroll_track = ui.element("div").classes("scroll-track w-full")
             with scroll_track:
-                # live, patched rows (one copy)
+                # live, patched rows (one copy) + loop marker
                 real_wrap = ui.element("div").classes("scroll-real w-full")
                 with real_wrap:
                     list_container = ui.column().classes("w-full gap-0")
+                    _loop_marker()
                 # static clone for the seamless loop seam (rebuilt each render)
                 clone_container = ui.element("div").classes("scroll-clone w-full")
         more_label = ui.label("").classes("text-center text-gray-500 text-sm py-2")
@@ -434,6 +446,7 @@ def audience_page():
                             )
                         )
                         ui.label(eta_txt).classes(eta_cls)
+                _loop_marker()
 
         def render_queue():
             queue = svc.get_queue()
