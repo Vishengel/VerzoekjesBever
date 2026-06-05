@@ -34,7 +34,7 @@ class AudienceRowVM:
     is_glow: bool  # priority-glow animation target (pending_glow)
 
 
-PROMINENT_COUNT = 3
+PROMINENT_COUNT = 1
 
 
 def audience_row_vms(
@@ -77,9 +77,9 @@ def split_audience_vms(
 ) -> tuple[list[AudienceRowVM], list[AudienceRowVM]]:
     """Split windowed row VMs into the prominent head and the scrolling tail.
 
-    The first ``PROMINENT_COUNT`` rows (queue #1-3) render as large cards; the
-    rest scroll. ``is_last`` on the VMs is computed against the full window, so
-    the scroll tail's own last-row border is handled separately at render time.
+    The first ``PROMINENT_COUNT`` rows render as large cards; the rest scroll.
+    ``is_last`` on the VMs is computed against the full window, so the scroll
+    tail's own last-row border is handled separately at render time.
     """
     return vms[:PROMINENT_COUNT], vms[PROMINENT_COUNT:]
 
@@ -319,6 +319,7 @@ def audience_page():
         @dataclass
         class _PromRow:
             root: ui.element
+            pos: ui.label
             track_name: ui.label
             artist: ui.label
             requester: ui.label
@@ -327,6 +328,8 @@ def audience_page():
             eta_cls: str = ""
 
         def _patch_prom(h: _PromRow, vm: AudienceRowVM) -> None:
+            if h.pos.text != str(vm.position):
+                h.pos.set_text(str(vm.position))
             if h.track_name.text != vm.track_name:
                 h.track_name.set_text(vm.track_name)
             if h.artist.text != vm.artist:
@@ -355,10 +358,10 @@ def audience_page():
                 "items-center gap-4 flex-row beaver-delete-target"
             )
             # data-uid + beaver-delete-target: the delete-beaver chomps THIS card
-            # when the removed song is one of the prominent #1-3.
+            # when the removed song is one of the prominent up-next cards.
             card.props(f'data-uid="{vm.uid}"')
             with card:
-                ui.label(str(vm.position)).classes(
+                pos = ui.label(str(vm.position)).classes(
                     "text-green-400 font-extrabold text-2xl w-8 text-center"
                 )
                 if vm.thumb_url:
@@ -374,6 +377,7 @@ def audience_page():
                 eta = ui.label("").classes(ETA_NEXT)
             handle = _PromRow(
                 root=card,
+                pos=pos,
                 track_name=track_name,
                 artist=artist,
                 requester=requester,

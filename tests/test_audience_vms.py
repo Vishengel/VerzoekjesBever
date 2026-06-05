@@ -64,22 +64,26 @@ def test_split_separates_prominent_and_scroll():
     q = [_item(str(i)) for i in range(10)]
     vms = audience_row_vms(q, window=30, pending_add_uri=None, pending_glow_uri=None)
     prominent, scroll = split_audience_vms(vms)
-    pytest.assume(PROMINENT_COUNT == 3)
-    pytest.assume([v.uid for v in prominent] == ["0", "1", "2"])
-    pytest.assume([v.uid for v in scroll] == [str(i) for i in range(3, 10)])
+    pytest.assume(
+        [v.uid for v in prominent] == [str(i) for i in range(PROMINENT_COUNT)]
+    )
+    pytest.assume(
+        [v.uid for v in scroll] == [str(i) for i in range(PROMINENT_COUNT, 10)]
+    )
+    pytest.assume(len(prominent) + len(scroll) == 10)
 
 
-def test_split_small_queue_has_no_scroll():
-    q = [_item(str(i)) for i in range(2)]
+def test_split_at_prominent_count_has_no_scroll():
+    q = [_item(str(i)) for i in range(PROMINENT_COUNT)]
     vms = audience_row_vms(q, window=30, pending_add_uri=None, pending_glow_uri=None)
     prominent, scroll = split_audience_vms(vms)
-    pytest.assume([v.uid for v in prominent] == ["0", "1"])
+    pytest.assume(len(prominent) == PROMINENT_COUNT)
     pytest.assume(scroll == [])
 
 
-def test_split_exactly_prominent_count():
-    q = [_item(str(i)) for i in range(3)]
+def test_split_one_more_than_prominent_has_single_scroll():
+    q = [_item(str(i)) for i in range(PROMINENT_COUNT + 1)]
     vms = audience_row_vms(q, window=30, pending_add_uri=None, pending_glow_uri=None)
     prominent, scroll = split_audience_vms(vms)
-    pytest.assume(len(prominent) == 3)
-    pytest.assume(scroll == [])
+    pytest.assume(len(prominent) == PROMINENT_COUNT)
+    pytest.assume([v.uid for v in scroll] == [str(PROMINENT_COUNT)])
