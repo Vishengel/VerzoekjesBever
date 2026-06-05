@@ -193,7 +193,7 @@ def filter_queue_with_positions(
 
 
 @dataclass(frozen=True)
-class SkipMessageTemplate:
+class ShameTemplate:
     text: str
     uid: str = field(default_factory=lambda: uuid4().hex[:8])
 
@@ -201,14 +201,14 @@ class SkipMessageTemplate:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: dict) -> "SkipMessageTemplate":
+    def from_dict(cls, data: dict) -> "ShameTemplate":
         return cls(text=data["text"], uid=data.get("uid", uuid4().hex[:8]))
 
 
-DEFAULT_SKIP_TEMPLATES: list[str] = [
-    "Sorry {victim}, {skipper} hates {artist}",
+DEFAULT_SHAME_TEMPLATES: list[str] = [
+    "Sorry {victim}, {skipper} paid to delete {song}",
     "{skipper} paid good money to never hear {artist} again. Sorry {victim}.",
-    "Tough luck {victim}: {skipper} just skipped your {artist}.",
+    "Tough luck {victim}: {skipper} just deleted your {song}.",
     "Too bad {victim}, {skipper} thinks {artist} is just really mid :(",
 ]
 

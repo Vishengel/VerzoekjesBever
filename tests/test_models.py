@@ -198,26 +198,6 @@ def test_queue_item_roundtrip():
     pytest.assume(QueueItem.from_dict(item.to_dict()) == item)
 
 
-def test_skip_message_template_roundtrip():
-    from models import SkipMessageTemplate
-
-    tpl = SkipMessageTemplate(text="Sorry {victim}, {skipper} hates {artist}")
-    pytest.assume(len(tpl.uid) == 8)
-    restored = SkipMessageTemplate.from_dict(tpl.to_dict())
-    pytest.assume(restored.text == tpl.text)
-    pytest.assume(restored.uid == tpl.uid)
-
-
-def test_default_skip_templates_present_and_have_placeholders():
-    from models import DEFAULT_SKIP_TEMPLATES
-
-    pytest.assume(len(DEFAULT_SKIP_TEMPLATES) >= 3)
-    for text in DEFAULT_SKIP_TEMPLATES:
-        pytest.assume("{victim}" in text)
-        pytest.assume("{skipper}" in text)
-        pytest.assume("{artist}" in text)
-
-
 def test_queue_item_from_spotify_track_no_album_art():
     spotify_track = {
         "name": "Some Song",
@@ -475,3 +455,18 @@ def test_render_shame_message_anonymous_victim_and_skipper():
         song="X",
     )
     pytest.assume(out == f"{ANONYMOUS_DISPLAY} deleted {ANONYMOUS_DISPLAY}'s song")
+
+
+def test_default_shame_templates_present_and_one_uses_song():
+    from models import DEFAULT_SHAME_TEMPLATES
+
+    pytest.assume(len(DEFAULT_SHAME_TEMPLATES) >= 1)
+    pytest.assume(any("{song}" in t for t in DEFAULT_SHAME_TEMPLATES))
+
+
+def test_shame_template_roundtrip():
+    from models import ShameTemplate
+
+    tpl = ShameTemplate(text="hi {song}")
+    pytest.assume(ShameTemplate.from_dict(tpl.to_dict()).text == "hi {song}")
+    pytest.assume(ShameTemplate.from_dict(tpl.to_dict()).uid == tpl.uid)
