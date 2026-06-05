@@ -189,30 +189,35 @@ class DJPage:
                         self._render_queue()
 
                     with ui.row().classes("items-center gap-1"):
-                        time_in = (
-                            ui.input(placeholder="HH:MM").props("dense").classes("w-24")
+                        clock_btn = ui.button(icon="schedule").props(
+                            "flat round dense color=grey"
                         )
-                        if end:
-                            time_in.value = end.strftime("%H:%M")
-                        time_in.on("keydown.enter", lambda: _apply(time_in.value))
-                        ui.button(
-                            icon="schedule", on_click=lambda: _apply(time_in.value)
-                        ).props("flat round dense color=grey").tooltip(
-                            "Set party end time"
-                        )
+                        clock_btn.tooltip("Set party end time")
+                        with clock_btn, ui.menu() as menu:
+                            picker = ui.time(
+                                value=end.strftime("%H:%M") if end else None
+                            )
+                            with ui.row().classes("justify-end gap-1 w-full px-2 pb-2"):
+                                if end:
+                                    ui.button(
+                                        "Clear",
+                                        on_click=lambda: (
+                                            self.svc.clear_party_end(),
+                                            menu.close(),
+                                            end_time_control.refresh(),
+                                            self._render_queue(),
+                                        ),
+                                    ).props("flat dense color=grey")
+                                ui.button(
+                                    "Set",
+                                    on_click=lambda: (
+                                        _apply(picker.value),
+                                        menu.close(),
+                                    ),
+                                ).props("flat dense color=positive")
                         if end:
                             ui.label(f"Ends {end.strftime(_END_TIME_FMT)}").classes(
                                 "text-xs text-green-400"
-                            )
-                            ui.button(
-                                icon="close",
-                                on_click=lambda: (
-                                    self.svc.clear_party_end(),
-                                    end_time_control.refresh(),
-                                    self._render_queue(),
-                                ),
-                            ).props("flat round dense color=grey").tooltip(
-                                "Clear end time"
                             )
 
                 end_time_control()
