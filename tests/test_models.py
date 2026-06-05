@@ -47,12 +47,12 @@ def test_format_queue_stats_appends_clock_end_when_now_given():
     # current track has 2 min left + 10 min queued -> ends 21:52
     stats = format_queue_stats(queue, current_remaining_ms=2 * 60_000, now=now)
     pytest.assume("10m 0s remaining" in stats)
-    pytest.assume("End at 21:52" in stats)
+    pytest.assume("Queue ends at 21:52" in stats)
 
 
 def test_format_queue_stats_omits_end_without_now():
     queue = [QueueItem("A", "x", "", "g", "spotify:track:a", duration_ms=60_000)]
-    pytest.assume("End at" not in format_queue_stats(queue))
+    pytest.assume("Queue ends at" not in format_queue_stats(queue))
 
 
 def test_format_queue_stats_without_durations_omits_time():

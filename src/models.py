@@ -288,7 +288,7 @@ def format_queue_stats(
         stats += f" · {format_queue_duration(total_ms)} remaining"
         if now is not None:
             end = format_clock_eta(current_remaining_ms + total_ms, now)
-            stats += f" · End at {end}"
+            stats += f" · Queue ends at {end}"
     return stats
 
 
