@@ -271,7 +271,13 @@ def audience_page():
 
         def render_queue():
             queue = svc.get_queue()
-            stats_label.set_text(format_queue_stats(queue) if queue else "")
+            stats_label.set_text(
+                format_queue_stats(
+                    queue, svc.get_current_remaining_ms(), datetime.now()
+                )
+                if queue
+                else ""
+            )
             header_row.set_visibility(bool(queue))
             queue_card.set_visibility(bool(queue))
             vms = audience_row_vms(

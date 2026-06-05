@@ -271,12 +271,24 @@ def resolve_party_end(hhmm: str, now: datetime) -> datetime:
     return candidate
 
 
-def format_queue_stats(queue: list[QueueItem]) -> str:
-    """One-line queue summary: song count plus total remaining time when known."""
+def format_queue_stats(
+    queue: list[QueueItem],
+    current_remaining_ms: int = 0,
+    now: datetime | None = None,
+) -> str:
+    """One-line queue summary: song count, total remaining time, and—when ``now``
+    is given—the wall-clock time (24h ``HH:MM``) the queue is projected to finish.
+
+    The finish clock is ``now`` + ``current_remaining_ms`` (the playing track) +
+    the summed queued durations, matching :func:`format_clock_eta`.
+    """
     total_ms = sum(item.duration_ms for item in queue)
     stats = f"⏱ {len(queue)} songs"
     if total_ms:
         stats += f" · {format_queue_duration(total_ms)} remaining"
+        if now is not None:
+            end = format_clock_eta(current_remaining_ms + total_ms, now)
+            stats += f" · End at {end}"
     return stats
 
 

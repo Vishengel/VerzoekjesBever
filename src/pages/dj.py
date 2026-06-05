@@ -485,7 +485,22 @@ class DJPage:
 
     def _render_queue(self):
         queue = self.svc.get_queue()
-        self._stats_label.set_text(format_queue_stats(queue) if queue else "")
+        self._stats_label.set_text(
+            format_queue_stats(
+                queue, self.svc.get_current_remaining_ms(), datetime.now()
+            )
+            if queue
+            else ""
+        )
+        over = self.svc.queue_overshoots_end()
+        self._stats_label.classes(
+            remove="text-green-400/80 bg-green-900/30 text-red-300 bg-red-900/40",
+            add=(
+                "text-red-300 bg-red-900/40"
+                if over
+                else "text-green-400/80 bg-green-900/30"
+            ),
+        )
         self._clear_btn.set_visibility(bool(queue))
         self._empty_label.set_visibility(not queue)
 
@@ -571,7 +586,7 @@ class DJPage:
                             self.svc.remove_from_queue(uid),
                             self._render_queue(),
                         ),
-                    ).props("flat round dense color=grey size=sm").tooltip(
+                    ).props("outline round dense color=negative size=sm").tooltip(
                         "Delete (quiet)"
                     )
                     ui.button(

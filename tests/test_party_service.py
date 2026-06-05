@@ -1048,6 +1048,24 @@ def test_add_within_end_time_succeeds(service, store):
     pytest.assume(len(service.get_queue()) == 1)
 
 
+def test_queue_overshoots_end_false_without_end_time(service, store):
+    store.add_to_queue(_long_song(minutes=5))
+    pytest.assume(service.queue_overshoots_end() is False)
+
+
+def test_queue_overshoots_end_false_when_queue_fits(service, store):
+    store.set_party_end_time(datetime.now() + timedelta(hours=2))
+    store.add_to_queue(_long_song(minutes=5))
+    pytest.assume(service.queue_overshoots_end() is False)
+
+
+def test_queue_overshoots_end_true_when_end_lowered_below_queue(service, store):
+    # Seed the queue past the gate, then lower the end time beneath it.
+    store.add_to_queue(_long_song(minutes=5))
+    store.set_party_end_time(datetime.now() + timedelta(minutes=1))
+    pytest.assume(service.queue_overshoots_end() is True)
+
+
 def test_set_and_clear_party_end(service):
     resolved = service.set_party_end("23:30")
     pytest.assume(resolved.hour == 23 and resolved.minute == 30)

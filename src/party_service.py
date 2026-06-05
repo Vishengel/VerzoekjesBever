@@ -228,6 +228,22 @@ class PartyService:
         self._store.set_party_end_time(None)
         self._bump_version()
 
+    def queue_overshoots_end(self) -> bool:
+        """True when the queue's projected finish runs past the party end time.
+
+        Adds are blocked by :meth:`can_fit`, so this only fires when the end time
+        is lowered after the queue was built (or the playing track overhangs it).
+        """
+        if self._store.party_end_time is None:
+            return False
+        return not queue_fits(
+            self._store.party_end_time,
+            datetime.now(),
+            self.get_current_remaining_ms(),
+            self._store.queue,
+            0,
+        )
+
     def can_fit(self, candidate_duration_ms: int) -> bool:
         return queue_fits(
             self._store.party_end_time,
