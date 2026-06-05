@@ -6,6 +6,7 @@ import pytest
 from spotipy.exceptions import SpotifyException
 
 from models import (
+    ANONYMOUS_DISPLAY,
     PartyEventType,
     PlaybackInfo,
     PlaybackSignal,
@@ -46,7 +47,7 @@ def skip_store(tmp_path: Path):
 
 @pytest.fixture
 def service(mock_spotify, store, skip_store):
-    return PartyService(spotify=mock_spotify, store=store, skip_templates=skip_store)
+    return PartyService(spotify=mock_spotify, store=store, shame_templates=skip_store)
 
 
 def test_start_session(service, store):
@@ -247,7 +248,7 @@ def test_restart_mid_playback_does_not_spuriously_advance(
     store.add_to_queue(_make_item("Song2", uri="spotify:track:s2"))
 
     restarted = PartyService(
-        spotify=mock_spotify, store=store, skip_templates=skip_store
+        spotify=mock_spotify, store=store, shame_templates=skip_store
     )
 
     # First poll after restart: Spotify hasn't reported the track yet.
@@ -537,7 +538,7 @@ def test_session_persists_across_restart(service, mock_spotify, tmp_path, skip_s
     service.add_to_queue(_make_item("Song1", uri="spotify:track:s1", requester="Lisa"))
 
     store2 = QueueStore(tmp_path / "session.json")
-    svc2 = PartyService(spotify=mock_spotify, store=store2, skip_templates=skip_store)
+    svc2 = PartyService(spotify=mock_spotify, store=store2, shame_templates=skip_store)
     pytest.assume(svc2.has_session)
     pytest.assume(len(svc2.get_queue()) == 1)
     pytest.assume(svc2.get_queue()[0].track_name == "Song1")
@@ -789,11 +790,11 @@ def test_adem_refills_after_real_songs_drain(service, mock_spotify):
 
 def test_adem_queue_persists_across_restart(mock_spotify, tmp_path, skip_store):
     store1 = QueueStore(tmp_path / "session.json")
-    svc1 = PartyService(spotify=mock_spotify, store=store1, skip_templates=skip_store)
+    svc1 = PartyService(spotify=mock_spotify, store=store1, shame_templates=skip_store)
     svc1.start_session("Party", "dev1", adem_mode=True)
 
     store2 = QueueStore(tmp_path / "session.json")
-    svc2 = PartyService(spotify=mock_spotify, store=store2, skip_templates=skip_store)
+    svc2 = PartyService(spotify=mock_spotify, store=store2, shame_templates=skip_store)
     pytest.assume(svc2.adem_mode_active is True)
     pytest.assume(len(svc2.get_queue()) == ADEM_MODE_QUEUE_SIZE)
 
@@ -1067,88 +1068,113 @@ def test_adem_fill_unlimited_without_end_time(service):
     pytest.assume(len(service.get_queue()) == ADEM_MODE_QUEUE_SIZE)
 
 
-def test_skip_messages_enabled_defaults_on_and_toggles(service):
-    pytest.assume(service.skip_messages_enabled is True)
-    service.set_skip_messages_enabled(False)
-    pytest.assume(service.skip_messages_enabled is False)
+def test_shame_messages_enabled_defaults_on_and_toggles(service):
+    pytest.assume(service.shame_messages_enabled is True)
+    service.set_shame_messages_enabled(False)
+    pytest.assume(service.shame_messages_enabled is False)
 
 
-def test_skip_template_crud_passthrough(service):
-    before = len(service.get_skip_templates())
-    service.add_skip_template("{skipper} can't stand {artist}, sorry {victim}")
-    after = service.get_skip_templates()
+def test_shame_template_crud_passthrough(service):
+    before = len(service.get_shame_templates())
+    service.add_shame_template("{skipper} can't stand {artist}, sorry {victim}")
+    after = service.get_shame_templates()
     pytest.assume(len(after) == before + 1)
 
     target = next(t for t in after if "can't stand" in t.text)
-    service.remove_skip_template(target.uid)
-    pytest.assume(all(t.uid != target.uid for t in service.get_skip_templates()))
+    service.remove_shame_template(target.uid)
+    pytest.assume(all(t.uid != target.uid for t in service.get_shame_templates()))
 
 
-def _seed_now_playing(service, victim):
-    # queue two songs, advance so the first becomes "currently playing"
+def _seed_queue(service, requester="Dorieke"):
     service.start_session("Party", "dev1")
     service.add_to_queue(
-        _make_item("Africa", artist="Toto", uri="spotify:track:af", requester=victim)
+        _make_item("Africa", artist="Toto", uri="spotify:track:af", requester=requester)
     )
     service.add_to_queue(
         _make_item("Next", artist="NextArtist", uri="spotify:track:nx", requester="Bob")
     )
-    service.play_next()  # Africa is now currently_playing, "Next" still queued
 
 
-def test_paid_skip_emits_paid_skip_with_rendered_message(service):
-    _seed_now_playing(service, victim="Dorieke")
+def test_shame_delete_removes_item_and_emits_message(service):
+    _seed_queue(service, requester="Dorieke")
+    # Use a controlled template so the assertion is deterministic, not coupled
+    # to which random default template happens to be picked.
+    for t in list(service.get_shame_templates()):
+        service.remove_shame_template(t.uid)
+    service.add_shame_template("{skipper} removed {song} by {artist} from {victim}")
+    target = service.get_queue()[0]
+    survivor = service.get_queue()[1]
     v = service.version
-    service.paid_skip("Jelle")
+    service.shame_delete(target.uid, skipper="Jelle")
+    remaining = service.get_queue()
+    pytest.assume(all(q.uid != target.uid for q in remaining))
+    pytest.assume(any(q.uid == survivor.uid for q in remaining))  # non-target survives
     events = [
-        e for e in service.get_events_since(v) if e.kind == PartyEventType.PAID_SKIP
+        e for e in service.get_events_since(v) if e.kind == PartyEventType.SHAME_DELETE
     ]
     pytest.assume(len(events) == 1)
     msg = events[0].message
-    pytest.assume(msg is not None)
-    pytest.assume("Jelle" in msg)
-    pytest.assume("Dorieke" in msg)
-    pytest.assume("Toto" in msg)
+    pytest.assume(msg == "Jelle removed Africa by Toto from Dorieke")
 
 
-def test_paid_skip_toggle_off_emits_plain_skipped(service):
-    _seed_now_playing(service, victim="Dorieke")
-    service.set_skip_messages_enabled(False)
+def test_shame_delete_does_not_touch_playback(service):
+    _seed_queue(service)
+    service.play_next()  # "Africa" becomes currently-playing, "Next" stays queued
+    playing_before = service.get_currently_playing()
+    target = service.get_queue()[0]  # the still-queued "Next"
+    service.shame_delete(target.uid, skipper="Jelle")
+    playing_after = service.get_currently_playing()
+    pytest.assume(playing_after is not None)
+    pytest.assume(playing_after.uid == playing_before.uid)
+
+
+def test_shame_delete_unknown_uid_is_noop(service):
+    _seed_queue(service)
+    before = len(service.get_queue())
     v = service.version
-    service.paid_skip("Jelle")
-    kinds = [e.kind for e in service.get_events_since(v)]
-    pytest.assume(PartyEventType.SKIPPED in kinds)
-    pytest.assume(PartyEventType.PAID_SKIP not in kinds)
-
-
-def test_paid_skip_empty_pool_emits_plain_skipped(service):
-    _seed_now_playing(service, victim="Dorieke")
-    for t in list(service.get_skip_templates()):
-        service.remove_skip_template(t.uid)
-    v = service.version
-    service.paid_skip("Jelle")
-    kinds = [e.kind for e in service.get_events_since(v)]
-    pytest.assume(PartyEventType.SKIPPED in kinds)
-    pytest.assume(PartyEventType.PAID_SKIP not in kinds)
-
-
-def test_paid_skip_no_current_song_emits_plain_skipped(service):
-    # session started, nothing playing yet, one song queued
-    service.start_session("Party", "dev1")
-    service.add_to_queue(
-        _make_item("Africa", artist="Toto", uri="spotify:track:af", requester="X")
+    service.shame_delete("nope-nope", skipper="Jelle")
+    pytest.assume(len(service.get_queue()) == before)
+    pytest.assume(
+        all(e.kind != PartyEventType.SHAME_DELETE for e in service.get_events_since(v))
     )
+
+
+def test_shame_delete_blank_skipper_uses_anonymous(service):
+    _seed_queue(service)
+    for t in list(service.get_shame_templates()):
+        service.remove_shame_template(t.uid)
+    service.add_shame_template("{skipper} deleted {song}")
+    target = service.get_queue()[0]
     v = service.version
-    service.paid_skip("Jelle")
-    kinds = [e.kind for e in service.get_events_since(v)]
-    pytest.assume(PartyEventType.SKIPPED in kinds)
-    pytest.assume(PartyEventType.PAID_SKIP not in kinds)
+    service.shame_delete(target.uid, skipper="   ")
+    msg = [
+        e for e in service.get_events_since(v) if e.kind == PartyEventType.SHAME_DELETE
+    ][0].message
+    pytest.assume(ANONYMOUS_DISPLAY in msg)
 
 
-def test_paid_skip_advances_queue_like_play_next(service):
-    _seed_now_playing(service, victim="Dorieke")
-    service.paid_skip("Jelle")
-    current = service.get_currently_playing()
-    pytest.assume(current is not None)
-    pytest.assume(current.track_name == "Next")
-    pytest.assume(service.get_queue() == [])
+def test_shame_delete_silent_when_messages_disabled(service):
+    _seed_queue(service)
+    service.set_shame_messages_enabled(False)
+    target = service.get_queue()[0]
+    v = service.version
+    service.shame_delete(target.uid, skipper="Jelle")
+    ev = [
+        e for e in service.get_events_since(v) if e.kind == PartyEventType.SHAME_DELETE
+    ]
+    pytest.assume(len(ev) == 1)
+    pytest.assume(ev[0].message is None)
+    pytest.assume(all(q.uid != target.uid for q in service.get_queue()))
+
+
+def test_shame_delete_silent_when_no_templates(service):
+    _seed_queue(service)
+    for t in list(service.get_shame_templates()):
+        service.remove_shame_template(t.uid)
+    target = service.get_queue()[0]
+    v = service.version
+    service.shame_delete(target.uid, skipper="Jelle")
+    ev = [
+        e for e in service.get_events_since(v) if e.kind == PartyEventType.SHAME_DELETE
+    ][0]
+    pytest.assume(ev.message is None)

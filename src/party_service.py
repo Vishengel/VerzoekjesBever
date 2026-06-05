@@ -10,17 +10,19 @@ from spotipy.exceptions import SpotifyException
 
 from adem_mode import AdemMode
 from models import (
+    ANONYMOUS_REQUESTER,
     PartyEvent,
     PartyEventType,
     PlaybackInfo,
     PlaybackSignal,
     PlaybackState,
     QueueItem,
+    ShameTemplate,
     queue_fits,
-    render_skip_message,
+    render_shame_message,
     resolve_party_end,
 )
-from persistence import QueueStore, SkipTemplateStore
+from persistence import QueueStore, ShameTemplateStore
 
 if TYPE_CHECKING:
     from spotify_client import SpotifyClient
@@ -95,17 +97,17 @@ class PartyService:
         self,
         spotify: SpotifyClient,
         store: QueueStore,
-        skip_templates: SkipTemplateStore,
+        shame_templates: ShameTemplateStore,
     ):
         self._spotify = spotify
         self._store = store
-        self._skip_templates = skip_templates
+        self._shame_templates = shame_templates
         self._adem = AdemMode(store)
         self._version: int = 0
         self._events: list[PartyEvent] = []
         self._beaver_enabled: bool = True
         self._show_qr_code: bool = False
-        self._skip_messages_enabled: bool = True
+        self._shame_messages_enabled: bool = True
         # Settle period lives in memory: a fresh process must not instantly
         # treat a resumed-but-playing session as a lost track before Spotify
         # has even been polled once. Seed the window when restoring playback.
@@ -165,8 +167,8 @@ class PartyService:
         return self._beaver_enabled
 
     @property
-    def skip_messages_enabled(self) -> bool:
-        return self._skip_messages_enabled
+    def shame_messages_enabled(self) -> bool:
+        return self._shame_messages_enabled
 
     @property
     def show_qr_code(self) -> bool:
@@ -188,8 +190,8 @@ class PartyService:
     def set_beaver_enabled(self, enabled: bool) -> None:
         self._beaver_enabled = enabled
 
-    def set_skip_messages_enabled(self, enabled: bool) -> None:
-        self._skip_messages_enabled = enabled
+    def set_shame_messages_enabled(self, enabled: bool) -> None:
+        self._shame_messages_enabled = enabled
 
     def set_show_qr_code(self, enabled: bool) -> None:
         self._show_qr_code = enabled
@@ -312,38 +314,29 @@ class PartyService:
         if started:
             self._emit(PartyEventType.SKIPPED, item.track_uri)
 
-    def paid_skip(self, skipper: str) -> None:
-        victim_item = self._store.currently_playing
-        self._refill_adem_if_needed()
-        item = self._store.pop_next()
+    def shame_delete(self, uid: str, skipper: str) -> None:
+        item = next((q for q in self._store.queue if q.uid == uid), None)
         if item is None:
             return
-        started = self._start_track(item)
+        message = self._build_shame_message(skipper, item)
+        self._store.remove_from_queue(uid)
         self._bump_version()
-        if not started:
-            return
-        message = self._build_paid_skip_message(skipper, victim_item)
-        if message is None:
-            self._emit(PartyEventType.SKIPPED, item.track_uri)
-        else:
-            self._emit(PartyEventType.PAID_SKIP, item.track_uri, message=message)
+        self._emit(PartyEventType.SHAME_DELETE, item.track_uri, message=message)
 
-    def _build_paid_skip_message(
-        self, skipper: str, victim_item: QueueItem | None
-    ) -> str | None:
-        if victim_item is None:
+    def _build_shame_message(self, skipper: str, item: QueueItem) -> str | None:
+        if not self._shame_messages_enabled:
             return None
-        if not self._skip_messages_enabled:
-            return None
-        templates = self._skip_templates.get_all()
+        templates = self._shame_templates.get_all()
         if not templates:
             return None
+        resolved_skipper = skipper.strip() or ANONYMOUS_REQUESTER
         template = random.choice(templates)
-        return render_skip_message(
+        return render_shame_message(
             template.text,
-            skipper=skipper,
-            victim=victim_item.requester,
-            artist=victim_item.artist,
+            skipper=resolved_skipper,
+            victim=item.requester or ANONYMOUS_REQUESTER,
+            artist=item.artist,
+            song=item.track_name,
         )
 
     def pause(self) -> None:
@@ -374,17 +367,17 @@ class PartyService:
     def get_known_requesters(self) -> list[str]:
         return self._store.get_known_requesters()
 
-    def get_skip_templates(self):
-        return self._skip_templates.get_all()
+    def get_shame_templates(self) -> list[ShameTemplate]:
+        return self._shame_templates.get_all()
 
-    def add_skip_template(self, text: str) -> None:
-        self._skip_templates.add(text)
+    def add_shame_template(self, text: str) -> None:
+        self._shame_templates.add(text)
 
-    def remove_skip_template(self, uid: str) -> None:
-        self._skip_templates.remove(uid)
+    def remove_shame_template(self, uid: str) -> None:
+        self._shame_templates.remove(uid)
 
-    def reset_skip_templates(self) -> None:
-        self._skip_templates.reset_to_default()
+    def reset_shame_templates(self) -> None:
+        self._shame_templates.reset_to_default()
 
     def get_devices(self) -> list[dict]:
         return self._spotify.get_devices()
