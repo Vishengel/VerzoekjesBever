@@ -25,6 +25,11 @@ class Config(BaseSettings):
     # snappier auto-advance at track end.
     playback_poll_interval_s: float = 1.5
 
+    # Max queue rows the audience billboard materialises (prominent + scrolling
+    # combined). Caps DOM/memory so large queues stay smooth; the scroll loop
+    # covers this slice and a "+ N more" tail rides at its end.
+    audience_queue_window: int = 30
+
     model_config = SettingsConfigDict(
         env_file=project_root / ".env",
         env_file_encoding="utf-8",
