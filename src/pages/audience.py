@@ -393,7 +393,10 @@ def audience_page():
 
         def _rebuild_clone(scroll_vms: list[AudienceRowVM]) -> None:
             """Static (non-patched) duplicate of the scroll rows for the loop seam."""
-            sig = [(vm.uid, vm.position, vm.eta_ms) for vm in scroll_vms]
+            sig = [
+                (vm.uid, vm.position, vm.eta_ms, vm.track_name, vm.artist)
+                for vm in scroll_vms
+            ]
             if sig == clone_state["sig"]:
                 return
             clone_state["sig"] = sig
