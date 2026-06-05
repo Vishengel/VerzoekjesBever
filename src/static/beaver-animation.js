@@ -71,79 +71,105 @@ function runBeaverBoxAttack() {
     }, 2200);
 }
 
-function triggerPriorityGlow() {
-    var target = document.querySelector('.priority-glow-target');
-    if (!target) return;
-    target.style.animation = 'priority-glow 0.6s ease-in-out 3';
-    setTimeout(function() {
-        target.style.animation = '';
-    }, 2000);
+// The single always-visible prominent up-next card (the new #1). Zone-based
+// animations target this stable element, never a scrolling/off-screen row.
+function _promCard() {
+    return document.querySelector('.prominent-cards [data-uid]');
 }
 
-function triggerBeaverAddAnimation(isPriority) {
-    var wrapper = document.querySelector('.queue-add-target');
-    if (!wrapper) return;
-
-    var card = wrapper.querySelector('.beaver-incoming');
+// Move-to-top (or a priority add with the beaver disabled): golden glow on the
+// prominent card, no beaver actor.
+function triggerPromoteGlow() {
+    const card = _promCard();
     if (!card) return;
+    card.style.animation = 'priority-glow 0.6s ease-in-out 3';
+    setTimeout(function() { card.style.animation = ''; }, 2000);
+}
 
-    var existing = document.querySelector('.beaver-add-overlay');
+// Priority add (beaver on): beaver reveals the new #1 on the prominent card,
+// wearing a crown, then a golden glow. Self-applies/cleans up its own classes.
+function triggerBeaverPromote() {
+    const card = _promCard();
+    if (!card) return;  // queue empty / card not rendered yet
+
+    const existing = document.querySelector('.beaver-add-overlay');
     if (existing) existing.remove();
 
-    var variants = ['carry', 'toss', 'build'];
-    var pick = variants[Math.floor(Math.random() * variants.length)];
-    var duration = isPriority ? 1.5 : 2.2;
-
-    var keyframes = {
+    const variants = ['carry', 'toss', 'build'];
+    const pick = variants[Math.floor(Math.random() * variants.length)];
+    const duration = 1.5;
+    const keyframes = {
         carry: { beaver: 'carry-beaver-slide', card: 'carry-card-reveal' },
         toss: { beaver: 'toss-beaver-popup', card: 'toss-card-reveal' },
         build: { beaver: 'build-beaver-hammer', card: 'build-card-reveal' }
     };
 
-    var overlay = document.createElement('div');
+    const overlay = document.createElement('div');
     overlay.className = 'beaver-add-overlay beaver-add-' + pick;
-
-    var beaver = document.createElement('span');
+    const beaver = document.createElement('span');
     beaver.className = 'beaver-actor';
     beaver.style.animation = keyframes[pick].beaver + ' ' + duration + 's ease-in-out forwards';
-    var beaverEmoji = document.createElement('img');
-    beaverEmoji.className = 'beaver-emoji';
-    beaverEmoji.src = '/static/beaver.svg';
-    beaverEmoji.style.width = '80px';
-    beaverEmoji.style.height = '80px';
-    beaver.appendChild(beaverEmoji);
-    if (isPriority) {
-        var accessory = document.createElement('span');
-        accessory.className = 'beaver-accessory';
-        if (Math.random() >= 0.1) {
-            accessory.style.top = '-23px';
-        }
-        accessory.textContent = '👑';
-        beaver.appendChild(accessory);
-    }
+    const img = document.createElement('img');
+    img.className = 'beaver-emoji';
+    img.src = '/static/beaver.svg';
+    img.style.width = '80px';
+    img.style.height = '80px';
+    beaver.appendChild(img);
+    const crown = document.createElement('span');
+    crown.className = 'beaver-accessory';
+    crown.style.top = '-23px';
+    crown.textContent = '👑';
+    beaver.appendChild(crown);
     overlay.appendChild(beaver);
-    wrapper.appendChild(overlay);
 
+    // The prominent card is position:relative (beaver-delete-target), so the
+    // inset:0 overlay anchors over it.
+    card.appendChild(overlay);
+    card.classList.add('beaver-incoming');
     card.style.animation = keyframes[pick].card + ' ' + duration + 's ease-in-out forwards';
 
-    var cleanupDelay = (duration + 0.2) * 1000;
-
-    if (isPriority) {
+    setTimeout(function() {
+        card.classList.remove('beaver-incoming');
+        card.style.animation = 'priority-glow 0.6s ease-in-out 3';
         setTimeout(function() {
-            card.classList.remove('beaver-incoming');
-            card.style.animation = 'priority-glow 0.6s ease-in-out 3';
-            setTimeout(function() {
-                card.style.animation = '';
-                overlay.remove();
-            }, 2000);
-        }, cleanupDelay);
-    } else {
-        setTimeout(function() {
-            card.classList.remove('beaver-incoming');
             card.style.animation = '';
             overlay.remove();
-        }, cleanupDelay);
-    }
+        }, 2000);
+    }, (duration + 0.2) * 1000);
+}
+
+// Regular add (beaver on): the new song lands deep in the queue (off-screen),
+// so the beaver tosses it onto the COMING UP box. Pause the creep, pop a beaver
+// over the box with a green pulse, then resume.
+function triggerBeaverBoxAdd() {
+    const region = document.querySelector('.scroll-region');
+    if (!region) { triggerBeaverPromote(); return; }  // tiny queue: no box
+
+    const track = document.querySelector('.scroll-track');
+    if (track) track.classList.add('paused');
+
+    const existing = region.querySelector('.beaver-add-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'beaver-add-overlay beaver-add-toss';
+    const beaver = document.createElement('span');
+    beaver.className = 'beaver-actor';
+    beaver.style.animation = 'toss-beaver-popup 2.2s ease-in-out forwards';
+    const img = document.createElement('img');
+    img.src = '/static/beaver.svg';
+    img.style.width = '80px';
+    img.style.height = '80px';
+    beaver.appendChild(img);
+    overlay.appendChild(beaver);
+    region.appendChild(overlay);
+    region.classList.add('box-add');
+
+    setTimeout(function() {
+        region.classList.remove('box-add');
+        overlay.remove();
+        if (track) track.classList.remove('paused');
+    }, 2400);
 }
 
 function triggerShameOverlay(message) {

@@ -30,31 +30,22 @@ class AudienceRowVM:
     position: int
     eta_ms: int
     is_last: bool
-    is_target: bool  # incoming-add animation target (pending_add)
-    is_glow: bool  # priority-glow animation target (pending_glow)
 
 
 PROMINENT_COUNT = 1
 
 
-def audience_row_vms(
-    queue: list,
-    *,
-    window: int,
-    pending_add_uri: str | None,
-    pending_glow_uri: str | None,
-) -> list[AudienceRowVM]:
-    """Pure view-models for the audience queue rows (windowed, with ETA)."""
+def audience_row_vms(queue: list, *, window: int) -> list[AudienceRowVM]:
+    """Pure view-models for the audience queue rows (windowed, with ETA).
+
+    Beaver animations are zone-based (now-playing card, prominent up-next card,
+    or the scroll box) rather than row-targeted, so rows carry no animation
+    flags — the JS targets stable, always-visible zones instead.
+    """
     positioned = filter_queue_with_positions(queue, "")[:window]
     vms: list[AudienceRowVM] = []
     for i, p in enumerate(positioned):
         item = p.item
-        is_target = bool(pending_add_uri) and item.track_uri == pending_add_uri
-        is_glow = (
-            not is_target
-            and bool(pending_glow_uri)
-            and item.track_uri == pending_glow_uri
-        )
         vms.append(
             AudienceRowVM(
                 uid=item.uid,
@@ -65,8 +56,6 @@ def audience_row_vms(
                 position=p.position,
                 eta_ms=p.eta_ms,
                 is_last=i == len(positioned) - 1,
-                is_target=is_target,
-                is_glow=is_glow,
             )
         )
     return vms
@@ -131,9 +120,6 @@ def audience_page():
                 )
                 ui.label("Check back soon!").classes("text-gray-500")
             return
-
-        pending_add = {"uri": None}
-        pending_glow = {"uri": None}
 
         # --- now-playing (gated rebuild) ---
         np_container = ui.column().classes("w-full gap-0")
@@ -231,13 +217,7 @@ def audience_page():
         # added by ui.row()'s constructor. Without "nicegui-row" here the row
         # collapses to a block and children stack vertically. Any new structural
         # default class must be added to BASE_ROW too, or replace= will nuke it.
-        # "beaver-delete-target" gives the row position:relative so the chomp
-        # overlay can absolutely-position itself over the row being shame-deleted.
-        # Like nicegui-row, it lives in BASE_ROW because _patch_row's
-        # .classes(replace=...) wipes anything not re-listed here.
-        BASE_ROW = (
-            "nicegui-row items-center gap-3 px-4 py-3 w-full beaver-delete-target"
-        )
+        BASE_ROW = "nicegui-row items-center gap-3 px-4 py-3 w-full"
         ETA_NEXT = (
             "text-green-400 font-bold text-sm whitespace-nowrap ml-auto "
             "bg-white/5 rounded-full px-3 py-1 w-28 text-center"
@@ -249,16 +229,12 @@ def audience_page():
 
         @dataclass
         class _AudRow:
-            root: ui.element  # wrapper div; toggles .queue-add-target
-            row: (
-                ui.row
-            )  # inner row; toggles .beaver-incoming / .priority-glow-target / border
+            root: ui.row  # the row element (KeyedList moves/deletes this)
             pos: ui.label
             requester: ui.label
             eta: ui.label
             eta_cls: str = ""
             row_cls: str = ""
-            root_cls: str = ""
 
         def _patch_row(h: _AudRow, vm: AudienceRowVM) -> None:
             if h.pos.text != str(vm.position):
@@ -280,44 +256,28 @@ def audience_page():
                 h.eta.classes(replace=eta_cls)
                 h.eta_cls = eta_cls
             row_cls = BASE_ROW + ("" if vm.is_last else " border-b border-white/5")
-            if vm.is_target:
-                row_cls += " beaver-incoming"
-            if vm.is_glow:
-                row_cls += " priority-glow-target"
             if h.row_cls != row_cls:
-                h.row.classes(replace=row_cls)
                 h.row_cls = row_cls
-            root_cls = "w-full queue-add-target" if vm.is_target else "w-full"
-            if h.root_cls != root_cls:
-                h.root.classes(replace=root_cls)
-                h.root_cls = root_cls
+                h.root.classes(replace=row_cls)
 
         def _build_row(vm: AudienceRowVM) -> _AudRow:
-            wrapper = ui.element("div").classes("w-full")
-            with wrapper:
-                row = ui.row().classes(BASE_ROW)
-                # no data-uid: scroll rows are not beaver-delete targets (the
-                # delete-beaver chomps the prominent card, or attacks the box).
-                with row:
-                    pos = ui.label(str(vm.position)).classes(
-                        "text-green-400 font-extrabold text-lg w-7 text-center"
+            row = ui.row().classes(BASE_ROW)
+            with row:
+                pos = ui.label(str(vm.position)).classes(
+                    "text-green-400 font-extrabold text-lg w-7 text-center"
+                )
+                if vm.thumb_url:
+                    ui.image(vm.thumb_url).classes("w-11 h-11 rounded-md").props(
+                        "loading=lazy"
                     )
-                    if vm.thumb_url:
-                        ui.image(vm.thumb_url).classes("w-11 h-11 rounded-md").props(
-                            "loading=lazy"
-                        )
-                    with ui.column().classes("flex-grow gap-0"):
-                        ui.label(vm.track_name).classes(
-                            "text-white font-semibold text-base"
-                        )
-                        ui.label(vm.artist).classes("text-gray-400 text-sm")
-                        requester = ui.label("").classes(
-                            "text-orange-400 text-xs mt-0.5"
-                        )
-                    eta = ui.label("").classes(ETA_WAIT)
-            handle = _AudRow(
-                root=wrapper, row=row, pos=pos, requester=requester, eta=eta
-            )
+                with ui.column().classes("flex-grow gap-0"):
+                    ui.label(vm.track_name).classes(
+                        "text-white font-semibold text-base"
+                    )
+                    ui.label(vm.artist).classes("text-gray-400 text-sm")
+                    requester = ui.label("").classes("text-orange-400 text-xs mt-0.5")
+                eta = ui.label("").classes(ETA_WAIT)
+            handle = _AudRow(root=row, pos=pos, requester=requester, eta=eta)
             _patch_row(handle, vm)
             return handle
 
@@ -458,12 +418,7 @@ def audience_page():
                 else ""
             )
             header_row.set_visibility(bool(queue))
-            vms = audience_row_vms(
-                queue,
-                window=CONFIG.audience_queue_window,
-                pending_add_uri=pending_add["uri"],
-                pending_glow_uri=pending_glow["uri"],
-            )
+            vms = audience_row_vms(queue, window=CONFIG.audience_queue_window)
             prominent_vms, scroll_vms = split_audience_vms(vms)
             prominent_list.reconcile(prominent_vms)
             queue_list.reconcile(scroll_vms)
@@ -614,6 +569,12 @@ def audience_page():
             events = svc.get_events_since(local_version["v"])
             local_version["v"] = svc.version
 
+            # Zone-based beaver dispatch: each event animates a stable, visible
+            # zone (now-playing card / prominent up-next card / scroll box),
+            # never a row that may be scrolled off-screen or duplicated.
+            top_beaver = False  # priority add (beaver on) -> reveal prominent card
+            box_beaver = False  # regular add (beaver on) -> toss onto scroll box
+            glow = False  # move-to-top, or priority add (beaver off) -> card glow
             for event in events:
                 if event.kind == PartyEventType.SKIPPED and svc.beaver_enabled:
                     await ui.run_javascript("triggerBeaverAnimation()")
@@ -631,16 +592,14 @@ def audience_page():
                         )
                         await asyncio.sleep(6)
 
-                if event.kind == PartyEventType.ADDED and svc.beaver_enabled:
-                    pending_add["uri"] = event.track_uri
+                if event.kind == PartyEventType.ADDED:
+                    if event.is_priority:
+                        top_beaver = top_beaver or svc.beaver_enabled
+                        glow = glow or not svc.beaver_enabled
+                    elif svc.beaver_enabled:
+                        box_beaver = True
                 if event.kind == PartyEventType.MOVED_TO_TOP:
-                    pending_glow["uri"] = event.track_uri
-                elif (
-                    event.kind == PartyEventType.ADDED
-                    and event.is_priority
-                    and not svc.beaver_enabled
-                ):
-                    pending_glow["uri"] = event.track_uri
+                    glow = True
 
             render_all()
             qr_overlay.refresh()
@@ -648,21 +607,14 @@ def audience_page():
             if (search_input.value or "").strip():
                 search_results.refresh()
 
-            if pending_add["uri"]:
-                is_priority = any(
-                    e.kind == PartyEventType.ADDED and e.is_priority for e in events
-                )
-                await ui.run_javascript(
-                    f"triggerBeaverAddAnimation({str(is_priority).lower()})"
-                )
-                await asyncio.sleep(3.5 if is_priority else 2.4)
-                pending_add["uri"] = None
-                render_queue()  # clear the incoming class now the animation is done
-
-            if pending_glow["uri"]:
-                await ui.run_javascript("triggerPriorityGlow()")
+            if top_beaver:
+                await ui.run_javascript("triggerBeaverPromote()")
+                await asyncio.sleep(3.5)
+            if box_beaver:
+                await ui.run_javascript("triggerBeaverBoxAdd()")
+                await asyncio.sleep(2.4)
+            if glow:
+                await ui.run_javascript("triggerPromoteGlow()")
                 await asyncio.sleep(2.0)
-                pending_glow["uri"] = None
-                render_queue()
 
         ui.timer(1.0, check_updates)

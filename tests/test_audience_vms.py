@@ -24,7 +24,7 @@ def _item(uid, uri="spotify:track:x", req="", dur=60000):
 
 def test_positions_and_eta_accumulate():
     q = [_item("a", dur=60000), _item("b", dur=90000)]
-    vms = audience_row_vms(q, window=30, pending_add_uri=None, pending_glow_uri=None)
+    vms = audience_row_vms(q, window=30)
     pytest.assume(isinstance(vms[0], AudienceRowVM))
     pytest.assume([v.uid for v in vms] == ["a", "b"])
     pytest.assume(vms[0].position == 1 and vms[0].eta_ms == 0)
@@ -34,35 +34,14 @@ def test_positions_and_eta_accumulate():
 
 def test_window_truncates():
     q = [_item(str(i)) for i in range(40)]
-    vms = audience_row_vms(q, window=30, pending_add_uri=None, pending_glow_uri=None)
+    vms = audience_row_vms(q, window=30)
     pytest.assume(len(vms) == 30)
     pytest.assume(vms[-1].is_last is True)
 
 
-def test_pending_flags_match_by_uri():
-    q = [_item("a", uri="spotify:track:hit"), _item("b", uri="spotify:track:miss")]
-    vms = audience_row_vms(
-        q, window=30, pending_add_uri="spotify:track:hit", pending_glow_uri=None
-    )
-    pytest.assume(vms[0].is_target is True)
-    pytest.assume(vms[1].is_target is False)
-
-
-def test_is_target_wins_when_uri_matches_both():
-    q = [_item("a", uri="spotify:track:hit")]
-    vms = audience_row_vms(
-        q,
-        window=30,
-        pending_add_uri="spotify:track:hit",
-        pending_glow_uri="spotify:track:hit",
-    )
-    pytest.assume(vms[0].is_target is True)
-    pytest.assume(vms[0].is_glow is False)
-
-
 def test_split_separates_prominent_and_scroll():
     q = [_item(str(i)) for i in range(10)]
-    vms = audience_row_vms(q, window=30, pending_add_uri=None, pending_glow_uri=None)
+    vms = audience_row_vms(q, window=30)
     prominent, scroll = split_audience_vms(vms)
     pytest.assume(
         [v.uid for v in prominent] == [str(i) for i in range(PROMINENT_COUNT)]
@@ -75,7 +54,7 @@ def test_split_separates_prominent_and_scroll():
 
 def test_split_at_prominent_count_has_no_scroll():
     q = [_item(str(i)) for i in range(PROMINENT_COUNT)]
-    vms = audience_row_vms(q, window=30, pending_add_uri=None, pending_glow_uri=None)
+    vms = audience_row_vms(q, window=30)
     prominent, scroll = split_audience_vms(vms)
     pytest.assume(len(prominent) == PROMINENT_COUNT)
     pytest.assume(scroll == [])
@@ -83,7 +62,7 @@ def test_split_at_prominent_count_has_no_scroll():
 
 def test_split_one_more_than_prominent_has_single_scroll():
     q = [_item(str(i)) for i in range(PROMINENT_COUNT + 1)]
-    vms = audience_row_vms(q, window=30, pending_add_uri=None, pending_glow_uri=None)
+    vms = audience_row_vms(q, window=30)
     prominent, scroll = split_audience_vms(vms)
     pytest.assume(len(prominent) == PROMINENT_COUNT)
     pytest.assume([v.uid for v in scroll] == [str(PROMINENT_COUNT)])
