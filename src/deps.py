@@ -1,5 +1,5 @@
 from party_service import PartyService
-from persistence import QueueStore, SkipTemplateStore
+from persistence import QueueStore, ShameTemplateStore
 from spotify_client import SpotifyClient
 from config import CONFIG
 
@@ -11,9 +11,9 @@ def get_service() -> PartyService:
     if _service is None:
         spotify = SpotifyClient()
         store = QueueStore(CONFIG.queue_store_path)
-        skip_templates = SkipTemplateStore(CONFIG.skip_templates_path)
+        shame_templates = ShameTemplateStore(CONFIG.shame_templates_path)
         _service = PartyService(
-            spotify=spotify, store=store, skip_templates=skip_templates
+            spotify=spotify, store=store, shame_templates=shame_templates
         )
     return _service
 
