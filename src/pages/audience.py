@@ -8,6 +8,7 @@ from datetime import datetime
 import segno
 from nicegui import ui
 
+from config import CONFIG
 from deps import get_service
 from keyed_list import KeyedList
 from models import (
@@ -17,8 +18,6 @@ from models import (
     format_queue_stats,
     search_queue,
 )
-
-QUEUE_WINDOW = 30
 
 
 @dataclass(frozen=True)
@@ -107,6 +106,8 @@ def audience_page():
 
     ui.add_head_html('<link rel="stylesheet" href="/static/beaver-animation.css">')
     ui.add_head_html('<script src="/static/beaver-animation.js"></script>')
+    ui.add_head_html('<link rel="stylesheet" href="/static/audience-scroll.css">')
+    ui.add_head_html('<script src="/static/audience-scroll.js"></script>')
     ui.add_head_html("""
     <style>
         body { background: linear-gradient(135deg, #0d0d1a 0%, #1a1a3e 100%) !important; }
@@ -191,11 +192,26 @@ def audience_page():
                 "bg-white/5 rounded-full px-4 py-1"
             )
 
-        # --- queue list (KeyedList) ---
-        queue_card = ui.card().classes("w-full bg-white/5 rounded-xl p-1")
-        with queue_card:
-            list_container = ui.column().classes("w-full gap-0")
-            more_label = ui.label("").classes("text-center text-gray-500 text-sm py-2")
+        # --- prominent cards (queue #1-3) ---
+        # "prominent-cards" lets the delete-beaver JS scope its data-uid lookup
+        # to these always-visible cards.
+        prominent_container = ui.column().classes("prominent-cards w-full gap-2")
+
+        # --- COMING UP scroll region ---
+        coming_up_header = ui.label("COMING UP").classes(
+            "text-xs font-bold tracking-[0.2em] text-green-400/50 mt-3"
+        )
+        scroll_region = ui.element("div").classes("scroll-region w-full")
+        with scroll_region:
+            scroll_track = ui.element("div").classes("scroll-track w-full")
+            with scroll_track:
+                # live, patched rows (one copy)
+                real_wrap = ui.element("div").classes("scroll-real w-full")
+                with real_wrap:
+                    list_container = ui.column().classes("w-full gap-0")
+                # static clone for the seamless loop seam (rebuilt each render)
+                clone_container = ui.element("div").classes("scroll-clone w-full")
+        more_label = ui.label("").classes("text-center text-gray-500 text-sm py-2")
 
         # NOTE: leading "nicegui-row" is the framework's default flex class
         # (display:flex; flex-direction:row). _patch_row reapplies BASE_ROW via
@@ -268,13 +284,16 @@ def audience_page():
             wrapper = ui.element("div").classes("w-full")
             with wrapper:
                 row = ui.row().classes(BASE_ROW)
-                row.props(f'data-uid="{vm.uid}"')
+                # no data-uid: scroll rows are not beaver-delete targets (the
+                # delete-beaver chomps the prominent card, or attacks the box).
                 with row:
                     pos = ui.label(str(vm.position)).classes(
                         "text-green-400 font-extrabold text-lg w-7 text-center"
                     )
                     if vm.thumb_url:
-                        ui.image(vm.thumb_url).classes("w-11 h-11 rounded-md")
+                        ui.image(vm.thumb_url).classes("w-11 h-11 rounded-md").props(
+                            "loading=lazy"
+                        )
                     with ui.column().classes("flex-grow gap-0"):
                         ui.label(vm.track_name).classes(
                             "text-white font-semibold text-base"
@@ -297,6 +316,118 @@ def audience_page():
             patch=_patch_row,
         )
 
+        @dataclass
+        class _PromRow:
+            root: ui.element
+            track_name: ui.label
+            artist: ui.label
+            requester: ui.label
+            eta: ui.label
+            eta_text: str = ""
+            eta_cls: str = ""
+
+        def _patch_prom(h: _PromRow, vm: AudienceRowVM) -> None:
+            if h.track_name.text != vm.track_name:
+                h.track_name.set_text(vm.track_name)
+            if h.artist.text != vm.artist:
+                h.artist.set_text(vm.artist)
+            req_text = f"🎤 {vm.requester}" if vm.requester else ""
+            if h.requester.text != req_text:
+                h.requester.set_text(req_text)
+            h.requester.set_visibility(bool(vm.requester))
+            if vm.eta_ms == 0:
+                eta_text, eta_cls = "Up next", ETA_NEXT
+            else:
+                eta_text = "ETA " + format_clock_eta(
+                    svc.get_current_remaining_ms() + vm.eta_ms, datetime.now()
+                )
+                eta_cls = ETA_WAIT
+            if h.eta_text != eta_text:
+                h.eta.set_text(eta_text)
+                h.eta_text = eta_text
+            if h.eta_cls != eta_cls:
+                h.eta.classes(replace=eta_cls)
+                h.eta_cls = eta_cls
+
+        def _build_prom(vm: AudienceRowVM) -> _PromRow:
+            card = ui.card().classes(
+                "w-full bg-white/10 rounded-xl p-4 nicegui-row "
+                "items-center gap-4 flex-row beaver-delete-target"
+            )
+            # data-uid + beaver-delete-target: the delete-beaver chomps THIS card
+            # when the removed song is one of the prominent #1-3.
+            card.props(f'data-uid="{vm.uid}"')
+            with card:
+                ui.label(str(vm.position)).classes(
+                    "text-green-400 font-extrabold text-2xl w-8 text-center"
+                )
+                if vm.thumb_url:
+                    ui.image(vm.thumb_url).classes("w-16 h-16 rounded-lg").props(
+                        "loading=lazy"
+                    )
+                with ui.column().classes("flex-grow gap-0"):
+                    track_name = ui.label(vm.track_name).classes(
+                        "text-white font-bold text-xl"
+                    )
+                    artist = ui.label(vm.artist).classes("text-gray-300 text-base")
+                    requester = ui.label("").classes("text-orange-400 text-sm mt-0.5")
+                eta = ui.label("").classes(ETA_NEXT)
+            handle = _PromRow(
+                root=card,
+                track_name=track_name,
+                artist=artist,
+                requester=requester,
+                eta=eta,
+            )
+            _patch_prom(handle, vm)
+            return handle
+
+        prominent_list = KeyedList(
+            prominent_container,
+            key=lambda vm: vm.uid,
+            build=_build_prom,
+            patch=_patch_prom,
+        )
+
+        clone_state = {"sig": None}
+
+        def _rebuild_clone(scroll_vms: list[AudienceRowVM]) -> None:
+            """Static (non-patched) duplicate of the scroll rows for the loop seam."""
+            sig = [(vm.uid, vm.position, vm.eta_ms) for vm in scroll_vms]
+            if sig == clone_state["sig"]:
+                return
+            clone_state["sig"] = sig
+            clone_container.clear()
+            with clone_container:
+                for i, vm in enumerate(scroll_vms):
+                    row_cls = BASE_ROW + (
+                        "" if i == len(scroll_vms) - 1 else " border-b border-white/5"
+                    )
+                    with ui.row().classes(row_cls):
+                        ui.label(str(vm.position)).classes(
+                            "text-green-400 font-extrabold text-lg w-7 text-center"
+                        )
+                        if vm.thumb_url:
+                            ui.image(vm.thumb_url).classes(
+                                "w-11 h-11 rounded-md"
+                            ).props("loading=lazy")
+                        with ui.column().classes("flex-grow gap-0"):
+                            ui.label(vm.track_name).classes(
+                                "text-white font-semibold text-base"
+                            )
+                            ui.label(vm.artist).classes("text-gray-400 text-sm")
+                        eta_cls = ETA_NEXT if vm.eta_ms == 0 else ETA_WAIT
+                        eta_txt = (
+                            "Up next"
+                            if vm.eta_ms == 0
+                            else "ETA "
+                            + format_clock_eta(
+                                svc.get_current_remaining_ms() + vm.eta_ms,
+                                datetime.now(),
+                            )
+                        )
+                        ui.label(eta_txt).classes(eta_cls)
+
         def render_queue():
             queue = svc.get_queue()
             stats_label.set_text(
@@ -307,14 +438,22 @@ def audience_page():
                 else ""
             )
             header_row.set_visibility(bool(queue))
-            queue_card.set_visibility(bool(queue))
             vms = audience_row_vms(
                 queue,
-                window=QUEUE_WINDOW,
+                window=CONFIG.audience_queue_window,
                 pending_add_uri=pending_add["uri"],
                 pending_glow_uri=pending_glow["uri"],
             )
-            queue_list.reconcile(vms)
+            prominent_vms, scroll_vms = split_audience_vms(vms)
+            prominent_list.reconcile(prominent_vms)
+            queue_list.reconcile(scroll_vms)
+            _rebuild_clone(scroll_vms)
+
+            has_scroll = bool(scroll_vms)
+            coming_up_header.set_visibility(has_scroll)
+            scroll_region.set_visibility(has_scroll)
+            prominent_container.set_visibility(bool(prominent_vms))
+
             hidden = len(queue) - len(vms)
             more_label.set_visibility(hidden > 0)
             if hidden > 0:
@@ -325,6 +464,11 @@ def audience_page():
             render_queue()
 
         render_all()
+
+        async def _init_scroll():
+            await ui.run_javascript("setupAudienceScroll(); updateAudienceScroll()")
+
+        ui.timer(0.2, _init_scroll, once=True)
 
         display_url = f"http://{_get_local_ip()}:8000/display"
         qr_svg = _generate_qr_svg(display_url)
@@ -425,7 +569,7 @@ def audience_page():
                 "text-gray-300 text-sm"
             )
             ui.label(
-                f"The list shows the next {QUEUE_WINDOW} songs. "
+                f"The list shows the next {CONFIG.audience_queue_window} songs. "
                 "If there are more, you'll see a '+ N more songs' line."
             ).classes("text-gray-300 text-sm")
             ui.label(
@@ -480,6 +624,7 @@ def audience_page():
 
             render_all()
             qr_overlay.refresh()
+            await ui.run_javascript("updateAudienceScroll()")
             if (search_input.value or "").strip():
                 search_results.refresh()
 
