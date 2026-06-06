@@ -17,7 +17,9 @@ from pages import audience, benchmark, dj, login, spotify_auth, startup  # noqa:
 
 logger = logging.getLogger(__name__)
 
-app.add_static_files("/static", str(Path(__file__).parent / "static"))
+# max_cache_age=0: assets revalidate every load (ETag/304 keeps it cheap — no
+# body re-download). The default 3600s cache served stale CSS/JS after edits.
+app.add_static_files("/static", str(Path(__file__).parent / "static"), max_cache_age=0)
 
 
 async def poll_loop() -> None:
