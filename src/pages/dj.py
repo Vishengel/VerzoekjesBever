@@ -225,23 +225,23 @@ class DJPage:
                                 ),
                             ).props("flat dense color=positive")
 
-                # Group 1: state toggles
+                # Group 1: state toggles (shame edit sits with its toggle)
                 with ui.row().classes("items-center gap-2"):
                     beaver_toggle()
                     qr_toggle()
                     shame_msg_toggle()
-
-                ui.separator().props("vertical").classes("h-6 self-center")
-
-                # Group 2: party-end + content actions
-                with ui.row().classes("items-center gap-1"):
-                    end_time_control()
                     ui.button(
                         icon="edit_note",
                         on_click=self._open_shame_messages,
                     ).props("flat round dense color=grey").tooltip(
                         "Edit shame messages"
                     )
+
+                ui.separator().props("vertical").classes("h-6 self-center")
+
+                # Group 2: party-end time
+                with ui.row().classes("items-center gap-1"):
+                    end_time_control()
 
                 ui.separator().props("vertical").classes("h-6 self-center")
 
