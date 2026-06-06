@@ -10,6 +10,11 @@ const BILLBOARD_PX_PER_SEC = 22; // slow movie-credits creep
 
 let _billboardPaused = false;
 let _billboardLastTs = null;
+// Float scroll position we own. We must NOT read region.scrollTop back each
+// frame: the browser rounds scrollTop to whole pixels, so a sub-pixel creep
+// (22px/s ≈ 0.37px/frame) is truncated to 0 every frame and never advances.
+// Accumulate here in floating point, write the rounded value to the DOM.
+let _billboardPos = 0;
 
 function pauseAudienceScroll() { _billboardPaused = true; }
 function resumeAudienceScroll() { _billboardPaused = false; }
@@ -44,6 +49,7 @@ function setupAudienceScroll() {
         track.classList.remove('scrolling');
       }
       region.scrollTop = 0;
+      _billboardPos = 0;
       _billboardLastTs = ts;
       return;
     }
@@ -58,9 +64,11 @@ function setupAudienceScroll() {
     const dt = (ts - _billboardLastTs) / 1000;
     _billboardLastTs = ts;
 
-    let top = region.scrollTop + BILLBOARD_PX_PER_SEC * dt;
-    if (top >= halfHeight) top -= halfHeight;   // seamless wrap into the clone
-    region.scrollTop = top;
+    // Accumulate on our float, wrap with modulo (handles any overshoot if the
+    // queue shrinks), then write the rounded position. Owning the float is what
+    // lets sub-pixel-per-frame motion add up despite scrollTop's integer snap.
+    _billboardPos = (_billboardPos + BILLBOARD_PX_PER_SEC * dt) % halfHeight;
+    region.scrollTop = _billboardPos;
   }
   requestAnimationFrame(step);
 }
