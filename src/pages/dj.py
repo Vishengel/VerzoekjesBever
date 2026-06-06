@@ -537,7 +537,7 @@ class DJPage:
     def _build_dj_row(self, vm: DJRowVM) -> _DJRow:
         card = ui.card().classes("w-full bg-gray-900")
         with card:
-            with ui.row().classes("items-center gap-3"):
+            with ui.row().classes("items-center gap-3 w-full"):
                 with ui.column().classes("items-center gap-0 w-12"):
                     pos = ui.label(str(vm.position)).classes(
                         "text-gray-500 font-bold text-center"
@@ -558,6 +558,13 @@ class DJPage:
                             on_click=lambda uid=vm.uid: self._open_edit_requester(uid),
                         ).props("flat round dense size=xs color=orange")
                 with ui.column().classes("gap-0"):
+                    top = ui.button(
+                        icon="vertical_align_top",
+                        on_click=lambda uid=vm.uid: (
+                            self.svc.move_to_top(uid),
+                            self._render_queue(),
+                        ),
+                    ).props("flat round dense color=orange size=sm")
                     up = ui.button(
                         icon="arrow_upward",
                         on_click=lambda uid=vm.uid: (
@@ -572,13 +579,6 @@ class DJPage:
                             self._render_queue(),
                         ),
                     ).props("flat round dense color=warning size=sm")
-                top = ui.button(
-                    icon="vertical_align_top",
-                    on_click=lambda uid=vm.uid: (
-                        self.svc.move_to_top(uid),
-                        self._render_queue(),
-                    ),
-                ).props("flat round dense color=orange size=sm")
                 with ui.column().classes("gap-0"):
                     ui.button(
                         icon="delete",
