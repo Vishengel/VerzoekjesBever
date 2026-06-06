@@ -136,7 +136,7 @@ class DJPage:
             with ui.row().classes("items-center gap-2"):
                 ui.image("/static/beaver.svg").classes("w-8 h-8")
                 ui.label("VerzoekjesBever - DJ").classes("text-2xl font-bold")
-            with ui.row().classes("gap-2"):
+            with ui.row().classes("items-center gap-3"):
 
                 @ui.refreshable
                 def beaver_toggle():
@@ -151,8 +151,6 @@ class DJPage:
                         f"{'color=positive' if enabled else 'color=negative'} dense"
                     )
 
-                beaver_toggle()
-
                 @ui.refreshable
                 def qr_toggle():
                     enabled = self.svc.show_qr_code
@@ -166,7 +164,18 @@ class DJPage:
                         f"{'color=positive' if enabled else 'color=negative'} dense"
                     )
 
-                qr_toggle()
+                @ui.refreshable
+                def shame_msg_toggle():
+                    enabled = self.svc.shame_messages_enabled
+                    ui.button(
+                        "💬 Shame ON" if enabled else "🤐 Shame OFF",
+                        on_click=lambda: (
+                            self.svc.set_shame_messages_enabled(not enabled),
+                            shame_msg_toggle.refresh(),
+                        ),
+                    ).props(
+                        f"{'color=positive' if enabled else 'color=negative'} dense"
+                    )
 
                 @ui.refreshable
                 def end_time_control():
@@ -188,70 +197,66 @@ class DJPage:
                         end_time_control.refresh()
                         self._render_queue()
 
-                    with ui.row().classes("items-center gap-1"):
-                        clock_btn = ui.button(icon="schedule").props(
-                            "flat round dense color=grey"
-                        )
-                        clock_btn.tooltip("Set party end time")
-                        with clock_btn, ui.menu() as menu:
-                            picker = ui.time(
-                                value=end.strftime("%H:%M") if end else None
-                            )
-                            with ui.row().classes("justify-end gap-1 w-full px-2 pb-2"):
-                                if end:
-                                    ui.button(
-                                        "Clear",
-                                        on_click=lambda: (
-                                            self.svc.clear_party_end(),
-                                            menu.close(),
-                                            end_time_control.refresh(),
-                                            self._render_queue(),
-                                        ),
-                                    ).props("flat dense color=grey")
+                    # End time folds into the clock button's own label so it
+                    # never floats as loose text wedged between buttons.
+                    label = end.strftime(_END_TIME_FMT) if end else ""
+                    clock_btn = ui.button(label, icon="schedule").props(
+                        f"flat dense color={'positive' if end else 'grey'}"
+                    )
+                    clock_btn.tooltip("Set party end time")
+                    with clock_btn, ui.menu() as menu:
+                        picker = ui.time(value=end.strftime("%H:%M") if end else None)
+                        with ui.row().classes("justify-end gap-1 w-full px-2 pb-2"):
+                            if end:
                                 ui.button(
-                                    "Set",
+                                    "Clear",
                                     on_click=lambda: (
-                                        _apply(picker.value),
+                                        self.svc.clear_party_end(),
                                         menu.close(),
+                                        end_time_control.refresh(),
+                                        self._render_queue(),
                                     ),
-                                ).props("flat dense color=positive")
-                        if end:
-                            ui.label(f"Ends {end.strftime(_END_TIME_FMT)}").classes(
-                                "text-xs text-green-400"
-                            )
+                                ).props("flat dense color=grey")
+                            ui.button(
+                                "Set",
+                                on_click=lambda: (
+                                    _apply(picker.value),
+                                    menu.close(),
+                                ),
+                            ).props("flat dense color=positive")
 
-                end_time_control()
+                # Group 1: state toggles
+                with ui.row().classes("items-center gap-2"):
+                    beaver_toggle()
+                    qr_toggle()
+                    shame_msg_toggle()
 
-                @ui.refreshable
-                def shame_msg_toggle():
-                    enabled = self.svc.shame_messages_enabled
+                ui.separator().props("vertical").classes("h-6 self-center")
+
+                # Group 2: party-end + content actions
+                with ui.row().classes("items-center gap-1"):
+                    end_time_control()
                     ui.button(
-                        "💬 Shame ON" if enabled else "🤐 Shame OFF",
-                        on_click=lambda: (
-                            self.svc.set_shame_messages_enabled(not enabled),
-                            shame_msg_toggle.refresh(),
-                        ),
-                    ).props(
-                        f"{'color=positive' if enabled else 'color=negative'} dense"
+                        icon="edit_note",
+                        on_click=self._open_shame_messages,
+                    ).props("flat round dense color=grey").tooltip(
+                        "Edit shame messages"
                     )
 
-                shame_msg_toggle()
+                ui.separator().props("vertical").classes("h-6 self-center")
 
-                ui.button(
-                    icon="edit_note",
-                    on_click=self._open_shame_messages,
-                ).props("flat round dense color=grey").tooltip("Edit shame messages")
-
-                ui.button(
-                    "Display",
-                    on_click=lambda: ui.run_javascript(
-                        "window.open('/display', '_blank')"
-                    ),
-                ).props("flat color=grey dense")
-                ui.button(
-                    "Settings",
-                    on_click=lambda: ui.navigate.to("/"),
-                ).props("flat color=grey dense")
+                # Group 3: navigation
+                with ui.row().classes("items-center gap-1"):
+                    ui.button(
+                        "Display",
+                        on_click=lambda: ui.run_javascript(
+                            "window.open('/display', '_blank')"
+                        ),
+                    ).props("flat color=grey dense")
+                    ui.button(
+                        "Settings",
+                        on_click=lambda: ui.navigate.to("/"),
+                    ).props("flat color=grey dense")
 
     def _build_requester_input(self):
         with ui.card().classes("w-full bg-gray-900"):
