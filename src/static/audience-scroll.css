@@ -22,20 +22,6 @@
     display: none;
 }
 
-/* Soft fade at top & bottom edges so rows appear/vanish gracefully. */
-.scroll-region::before,
-.scroll-region::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: 28px;
-    z-index: 2;
-    pointer-events: none;
-}
-.scroll-region::before { top: 0; background: linear-gradient(to bottom, rgba(13,13,26,0.9), transparent); }
-.scroll-region::after  { bottom: 0; background: linear-gradient(to top, rgba(13,13,26,0.9), transparent); }
-
 /* During a delete attack the beaver overlay must sit above the edge fades. */
 .scroll-region.beaver-delete-target .beaver-overlay { z-index: 5; }
 

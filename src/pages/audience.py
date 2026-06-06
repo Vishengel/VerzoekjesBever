@@ -207,7 +207,7 @@ def audience_page():
             # of BOTH halves (real + clone) so the -50% wrap stays seamless;
             # CSS hides it when the queue isn't scrolling.
             with ui.row().classes(
-                "loop-marker items-center justify-center py-5 w-full"
+                "loop-marker items-center justify-center py-2 w-full"
             ):
                 ui.image("/static/beaver.svg").classes("w-8 h-8")
 
